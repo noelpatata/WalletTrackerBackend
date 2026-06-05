@@ -7,10 +7,12 @@ RUN apk add --no-cache \
     build-base \
     linux-headers
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock* ./
+RUN uv sync
 
 RUN apk del gcc musl-dev build-base linux-headers
 
@@ -18,4 +20,4 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]
+CMD ["uv", "run", "uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]
