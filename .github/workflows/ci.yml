@@ -26,7 +26,7 @@ jobs:
       - run: docker compose up -d --build
 
 
-      - run: docker compose exec -T app uv run pytest -v
+      - run: docker compose exec -T app pytest -v
 
       - if: always()
         run: docker compose down --volumes
