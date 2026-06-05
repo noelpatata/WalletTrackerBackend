@@ -36,18 +36,20 @@ pipeline {
                         ]
                     ) {
                         sh 'mkdir -p dependency-check-report'
-                        dependencyCheck additionalArguments: '--scan app --project wallet-tracker-api --format ALL --out dependency-check-report --nvdApiKey ${NVD_API_KEY}', odcInstallation: 'owasp dependency check 12.2.2'
+                        dependencyCheck(
+                            additionalArguments: "--scan app --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}",
+                            odcInstallation: 'owasp dependency check 12.2.2'
+                        )
 
                         def scannerHome = tool 'SonarScanner'
                         withSonarQubeEnv() {
                             sh "${scannerHome}/bin/sonar-scanner"
                         }
 
-                        sh 'docker build -t ${REGISTRY}/wallet-tracker:${IMAGE_VERSION} ./app'
-
+                        sh "docker build -t ${REGISTRY}/wallet-tracker:${params.IMAGE_VERSION} ./app"
                         sh """
                             echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin
-                            docker push ${REGISTRY}/wallet-tracker:${IMAGE_VERSION}
+                            docker push ${REGISTRY}/wallet-tracker:${params.IMAGE_VERSION}
                             docker logout ${REGISTRY}
                         """
                     }
@@ -56,6 +58,7 @@ pipeline {
             post {
                 always {
                     archiveArtifacts artifacts: 'dependency-check-report/**/*', allowEmptyArchive: true
+                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.json'
                 }
             }
         }
