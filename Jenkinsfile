@@ -37,7 +37,7 @@ pipeline {
                     ) {
                         sh 'mkdir -p dependency-check-report'
                         dependencyCheck(
-                            additionalArguments: '--scan app/requirements.txt --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
+                            additionalArguments: '--scan app/pyproject.toml --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
                             odcInstallation: 'owasp dependency check 12.2.2'
                         )
 
@@ -46,9 +46,9 @@ pipeline {
                             sh "${scannerHome}/bin/sonar-scanner"
                         }
 
-                        sh "docker build -t ${REGISTRY}/wallet-tracker:${params.IMAGE_VERSION} ./app"
+                        sh 'docker build -t ${REGISTRY}/wallet-tracker:${params.IMAGE_VERSION} ./app'
                         sh """
-                            echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin
+                            echo '${DOCKER_PASSWORD}' | docker login ${REGISTRY} -u '${DOCKER_USERNAME}' --password-stdin
                             docker push ${REGISTRY}/wallet-tracker:${params.IMAGE_VERSION}
                             docker logout ${REGISTRY}
                         """

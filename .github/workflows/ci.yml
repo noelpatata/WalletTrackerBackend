@@ -20,13 +20,13 @@ jobs:
           WALLET_TRACKER_SECRET=secret
           WALLET_TRACKER_DB_USER=root
           WALLET_TRACKER_DB_HOST=db
-          COMPOSE_PROFILES=app, db
+          COMPOSE_PROFILES=db,app
           EOF
 
       - run: docker compose up -d --build
 
 
-      - run: docker compose exec -T app pytest -v
+      - run: docker compose exec -T app uv run pytest -v
 
       - if: always()
         run: docker compose down --volumes

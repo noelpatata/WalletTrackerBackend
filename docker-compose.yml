@@ -2,9 +2,7 @@ services:
   db:
     container_name: mariadb
     profiles: ["db"]
-    build:
-      context: ./database
-      dockerfile: Dockerfile
+    image: mariadb:latest
     
     environment:
       MARIADB_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
@@ -15,9 +13,13 @@ services:
       
     volumes:
       - db_data:/var/lib/mysql
-    command: >
-      sh -c "envsubst < /docker-entrypoint-initdb.d/init.sql.template > /docker-entrypoint-initdb.d/init.sql &&
-         exec docker-entrypoint.sh mariadbd"
+    
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "127.0.0.1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
       
   app:
     container_name: wallettracker
@@ -30,6 +32,7 @@ services:
     ports:
       - "5000:5000"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 volumes:
   db_data:
