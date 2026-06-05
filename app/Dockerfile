@@ -7,10 +7,12 @@ RUN apk add --no-cache \
     build-base \
     linux-headers
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir --retries 10 --default-timeout=100 -r requirements.txt
+RUN uv pip install --system --no-cache -r requirements.txt
 
 RUN apk del gcc musl-dev build-base linux-headers
 
