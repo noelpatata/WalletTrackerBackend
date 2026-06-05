@@ -9,3 +9,4 @@ app/.pytest.env
 *.log
 testing/
 .pytest_cache
+
