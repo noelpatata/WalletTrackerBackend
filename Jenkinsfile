@@ -51,6 +51,16 @@ pipeline {
                         sh 'echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin' +
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
                            ' && docker logout ${REGISTRY}'*/
+
+                        dir('terraform') {
+                            sh 'terraform init'
+                            retry(3) {
+                                sh 'terraform plan'
+                            }
+                            retry(3) {
+                                sh 'terraform apply -auto-approve'
+                            }
+                        }
                     }
                 }
             }
@@ -58,31 +68,6 @@ pipeline {
                 always {
                     archiveArtifacts artifacts: 'dependency-check-report/**/*', allowEmptyArchive: true
                     dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.json'
-                }
-            }
-        }
-        stage('Terraform Init') {
-            steps {
-                dir('terraform') {
-                    sh 'terraform init'
-                }
-            }
-        }
-        stage('Terraform Plan') {
-            steps {
-                dir('terraform') {
-                    retry(3) {
-                        sh 'terraform plan'
-                    }
-                }
-            }
-        }
-        stage('Terraform Apply') {
-            steps {
-                dir('terraform') {
-                    retry(3) {
-                        sh 'terraform apply -auto-approve'
-                    }
                 }
             }
         }
