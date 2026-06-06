@@ -4,26 +4,26 @@ terraform {
       source  = "Telmate/proxmox"
       version = "3.0.2-rc07"
     }
-    vault = {
-      source  = "hashicorp/vault"
-      version = "~> 5.9"
-    }
     cloudflare = {
       source  = "cloudflare/cloudflare"
       version = "~> 5.19.1"
+    }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 4.0"
     }
   }
 }
 
 provider "vault" {
-  address           = "https://vault.downops.win"
-  skip_child_token  = true
+  address = var.vault_addr
 }
 
 data "vault_kv_secret_v2" "backend" {
   mount = "secret"
   name  = "wallet-tracker/backend"
 }
+
 data "vault_kv_secret_v2" "app" {
   mount = "secret"
   name  = "wallet-tracker/app"
