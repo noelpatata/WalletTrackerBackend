@@ -22,11 +22,11 @@ provider "vault" {
 
 data "vault_kv_secret_v2" "backend" {
   mount = "secret"
-  name  = "wallettracker/backend"
+  name  = "wallet-tracker/backend"
 }
 data "vault_kv_secret_v2" "app" {
   mount = "secret"
-  name  = "wallettracker/app"
+  name  = "wallet-tracker/app"
 }
 
 provider "cloudflare" {
