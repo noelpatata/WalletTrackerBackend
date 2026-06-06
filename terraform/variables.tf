@@ -1,3 +1,8 @@
+variable "vault_addr" {
+  description = "Vault server address"
+  type        = string
+}
+
 variable "proxmox_ip" {
   description = "Proxmox IP address"
   type        = string
