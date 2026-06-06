@@ -44,10 +44,9 @@ resource "null_resource" "setup_api_in_container" {
       #!/sbin/openrc-run
       description="WalletTracker uWSGI"
 
-      VENV_PATH="/srv/WalletTrackerAPI/app/.venv"
       directory="/srv/WalletTrackerAPI/app"
       pidfile="/run/wallettracker.pid"
-      command="$${VENV_PATH}/bin/uwsgi"
+      command="/usr/bin/uwsgi"
       command_args="--ini $${directory}/uwsgi.ini --logto2 /var/log/wallettracker.log"
       command_background="yes"
 
@@ -74,7 +73,7 @@ resource "null_resource" "setup_api_in_container" {
 
       pct exec ${proxmox_lxc.api.vmid} -- git clone https://github.com/noelpatata/WalletTrackerAPI.git /srv/WalletTrackerAPI
 
-      pct exec ${proxmox_lxc.api.vmid} -- pip install --no-cache-dir -r /srv/WalletTrackerAPI/app/requirements.txt
+      pct exec ${proxmox_lxc.api.vmid} -- pip install --no-cache-dir --retries 10 --default-timeout=100 -r /srv/WalletTrackerAPI/app/requirements.txt
 
       pct exec ${proxmox_lxc.api.vmid} -- apk del gcc musl-dev build-base linux-headers
 
@@ -112,10 +111,9 @@ resource "null_resource" "deploy_api" {
       #!/sbin/openrc-run
       description="WalletTracker uWSGI"
 
-      VENV_PATH="/srv/WalletTrackerAPI/app/.venv"
       directory="/srv/WalletTrackerAPI/app"
       pidfile="/run/wallettracker.pid"
-      command="$${VENV_PATH}/bin/uwsgi"
+      command="/usr/bin/uwsgi"
       command_args="--ini $${directory}/uwsgi.ini --logto2 /var/log/wallettracker.log"
       command_background="yes"
 
@@ -139,7 +137,7 @@ resource "null_resource" "deploy_api" {
       set -ex
       pct exec ${proxmox_lxc.api.vmid} -- git -C /srv/WalletTrackerAPI pull
 
-      pct exec ${proxmox_lxc.api.vmid} -- pip install --no-cache-dir -r /srv/WalletTrackerAPI/app/requirements.txt
+      pct exec ${proxmox_lxc.api.vmid} -- pip install --no-cache-dir --retries 10 --default-timeout=100 -r /srv/WalletTrackerAPI/app/requirements.txt
 
       pct exec ${proxmox_lxc.api.vmid} -- sh -c "export DATABASE_ROOT_PASSWORD='${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}'; export DATABASE_NAME='wallet_tracker'; export WALLET_TRACKER_DB_USER='root'; export WALLET_TRACKER_DB_HOST='${var.db_container_ip}'; python /srv/WalletTrackerAPI/app/migrate_all.py"
 
