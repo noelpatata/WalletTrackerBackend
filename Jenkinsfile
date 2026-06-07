@@ -6,6 +6,7 @@ pipeline {
     }
     environment {
         VAULT_ADDR = credentials('vault-addr')
+        VAULT_TOKEN = credentials('vault-token-text')
     }
     stages {
         stage('Checkout') {
@@ -19,7 +20,7 @@ pipeline {
                     withVault(
                         configuration: [
                             vaultUrl: env.VAULT_ADDR,
-                            vaultCredentialId: 'vault-token',
+                            vaultCredentialId: 'vault-token-text',
                             engineVersion: 2
                         ],
                         vaultSecrets: [
@@ -37,7 +38,7 @@ pipeline {
                     ) {
                         sh 'mkdir -p dependency-check-report'
                         dependencyCheck(
-                            additionalArguments: '--scan app/requirements.txt --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
+                            additionalArguments: "--scan app/requirements.txt --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}",
                             odcInstallation: 'owasp dependency check 12.2.2'
                         )
 
@@ -52,15 +53,13 @@ pipeline {
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
                            ' && docker logout ${REGISTRY}'*/
 
-                        withCredentials([vaultString(credentialsId: 'vault-token', variable: 'VAULT_TOKEN')]) {
-                            dir('terraform') {
-                                sh 'terraform init'
-                                retry(3) {
-                                    sh 'terraform plan'
-                                }
-                                retry(3) {
-                                    sh 'terraform apply -auto-approve'
-                                }
+                        dir('terraform') {
+                            sh 'terraform init'
+                            retry(3) {
+                                sh 'terraform plan'
+                            }
+                            retry(3) {
+                                sh 'terraform apply -auto-approve'
                             }
                         }
                     }
