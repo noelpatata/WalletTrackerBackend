@@ -52,13 +52,15 @@ pipeline {
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
                            ' && docker logout ${REGISTRY}'*/
 
-                        dir('terraform') {
-                            sh 'terraform init'
-                            retry(3) {
-                                sh 'terraform plan'
-                            }
-                            retry(3) {
-                                sh 'terraform apply -auto-approve'
+                        withCredentials([string(credentialsId: 'vault-token', variable: 'VAULT_TOKEN')]) {
+                            dir('terraform') {
+                                sh 'terraform init'
+                                retry(3) {
+                                    sh 'terraform plan'
+                                }
+                                retry(3) {
+                                    sh 'terraform apply -auto-approve'
+                                }
                             }
                         }
                     }
