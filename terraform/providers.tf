@@ -16,7 +16,8 @@ terraform {
 }
 
 provider "vault" {
-  address = var.vault_addr
+  address           = var.vault_addr
+  skip_child_token  = true
 }
 
 data "vault_kv_secret_v2" "backend" {
