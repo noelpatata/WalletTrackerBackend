@@ -37,7 +37,7 @@ pipeline {
                     ) {
                         sh 'mkdir -p dependency-check-report'
                         dependencyCheck(
-                            additionalArguments: "--scan app/requirements.txt --enableExperimental --project wallet-tracker-api --format JSON --format HTML --out dependency-check-report --nvdApiKey ${NVD_API_KEY}",
+                            additionalArguments: "--scan app/requirements.txt --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}",
                             odcInstallation: 'owasp dependency check 12.2.2'
                         )
 
@@ -52,7 +52,7 @@ pipeline {
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
                            ' && docker logout ${REGISTRY}'*/
 
-                        withCredentials([vaultToken(credentialsId: 'vault-token', variable: 'VAULT_TOKEN')]) {
+                        withCredentials([[$class: 'VaultTokenCredentialBinding', credentialsId: 'vault-token', vaultTokenVariable: 'VAULT_TOKEN']]) {
                             dir('terraform') {
                                 sh 'terraform init'
                                 retry(3) {
@@ -69,7 +69,7 @@ pipeline {
             post {
                 always {
                     archiveArtifacts artifacts: 'dependency-check-report/**/*', allowEmptyArchive: true
-                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.json'
+                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
                 }
             }
         }
