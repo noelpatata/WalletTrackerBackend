@@ -6,7 +6,6 @@ pipeline {
     }
     environment {
         VAULT_ADDR = credentials('vault-addr')
-        VAULT_TOKEN = credentials('vault-token-text')
     }
     stages {
         stage('Checkout') {
@@ -17,10 +16,11 @@ pipeline {
         stage('Vault dependent Stages') {
             steps {
                 script {
+                    withCredentials([[$class: 'VaultTokenCredentialBinding', credentialsId: 'vault-token', vaultAddr: env.VAULT_ADDR]]) {
                     withVault(
                         configuration: [
                             vaultUrl: env.VAULT_ADDR,
-                            vaultCredentialId: 'vault-token-text',
+                            vaultCredentialId: 'vault-token',
                             engineVersion: 2
                         ],
                         vaultSecrets: [
@@ -62,6 +62,7 @@ pipeline {
                                 sh 'terraform apply -auto-approve'
                             }
                         }
+                    }
                     }
                 }
             }
