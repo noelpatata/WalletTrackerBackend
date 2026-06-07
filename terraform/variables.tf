@@ -1,6 +1,7 @@
 variable "vault_addr" {
   description = "Vault server address"
   type        = string
+  default     = "https://vault.downops.win"
 }
 
 variable "proxmox_ip" {
