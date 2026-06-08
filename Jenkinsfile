@@ -47,11 +47,11 @@ pipeline {
                             sh "${scannerHome}/bin/sonar-scanner"
                         }
 
-                        /*def imageTag = params.IMAGE_VERSION
+                        def imageTag = params.IMAGE_VERSION
                         sh 'docker build -t ${REGISTRY}/wallet-tracker:' + imageTag + ' ./app'
                         sh 'echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin' +
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
-                           ' && docker logout ${REGISTRY}'*/
+                           ' && docker logout ${REGISTRY}'
 
                         dir('terraform') {
                             sh 'terraform init'
