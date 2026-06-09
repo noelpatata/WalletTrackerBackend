@@ -1,6 +1,8 @@
 FROM python:3.12-alpine
 
-RUN apk add --no-cache \
+RUN echo "https://dl-cdn.alpinelinux.org/alpine/v3.21/main" > /etc/apk/repositories && \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.21/community" >> /etc/apk/repositories && \
+    apk add --no-cache \
     ca-certificates \
     mariadb-dev \
     gcc \
