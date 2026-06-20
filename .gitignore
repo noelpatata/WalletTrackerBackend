@@ -5,8 +5,11 @@ __pycache__
 .env/
 app/.pytest.env
 .venv/
+ci/.venv/
+uv.lock
 *.pem
 *.log
 testing/
 .pytest_cache
+dependency-check-report/
 
