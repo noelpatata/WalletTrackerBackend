@@ -37,8 +37,10 @@ pipeline {
                         ]
                     ) {
                         sh 'mkdir -p dependency-check-report'
+                        sh 'uv export --project app --no-dev --format requirements-txt -o dependency-check-report/pinned-deps.txt'
+                        sh 'uv run --project ci cyclonedx-py requirements dependency-check-report/pinned-deps.txt --pyproject app/pyproject.toml -o dependency-check-report/sbom.xml --of XML'
                         dependencyCheck(
-                            additionalArguments: '--scan app/requirements.txt --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
+                            additionalArguments: '--scan dependency-check-report/sbom.xml --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
                             odcInstallation: 'owasp dependency check 12.2.2'
                         )
 

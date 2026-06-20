@@ -1,4 +1,4 @@
-FROM alpine:3.20
+FROM python:3.12-alpine
 
 RUN apk add --no-cache \
     ca-certificates \
@@ -7,16 +7,18 @@ RUN apk add --no-cache \
     musl-dev \
     build-base \
     linux-headers \
-    python3 \
-    py3-pip
+    uv
 
 WORKDIR /app
 
-COPY requirements.txt ./
-RUN pip3 install --no-cache-dir --retries 10 --default-timeout=100 -r requirements.txt \
-    && apk del gcc musl-dev build-base linux-headers
+COPY pyproject.toml ./
+RUN UV_SYSTEM_PYTHON=1 uv sync --no-install-project
+
+RUN apk del gcc musl-dev build-base linux-headers
 
 COPY . .
+
+ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 5000
 

@@ -40,7 +40,7 @@ HashiCorp Vault: stores all secrets (Jenkins credentials, DB passwords, API toke
 
 - **CI** — runs on every pull request to `main`: spins up the `app` container via Docker Compose and runs `pytest` against an in-memory SQLite DB (no real DB needed)
 - **CD** — runs on merge to `main`: fetches secrets from Vault and triggers a Jenkins webhook to deploy
-- **Post CD** — Jenkins builds the Docker image, scans it with Trivy, and also scans Python dependency manifests (`requirements.txt`) for high/critical vulnerabilities before pushing
+- **Post CD** — Jenkins builds the Docker image, scans it with Trivy, and also scans the CycloneDX SBOM for high/critical vulnerabilities before pushing
 - **Post CD** - Jenkins calls SonarQube to run the scanner.
 - To skip CD on a specific merge, add the **`skip cd`** label to the PR before merging
 
@@ -88,7 +88,7 @@ Activate — Windows:
 
 Install dependencies:
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 3. Environment variables
