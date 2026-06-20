@@ -31,18 +31,16 @@ pipeline {
                                     [envVar: 'REGISTRY',        vaultKey: 'REGISTRY_IP'],
                                     [envVar: 'DOCKER_USERNAME', vaultKey: 'REGISTRY_USER'],
                                     [envVar: 'DOCKER_PASSWORD', vaultKey: 'REGISTRY_PASSWORD'],
-                                    [envVar: 'NVD_API_KEY',     vaultKey: 'NVD_API_KEY']
+                                    [envVar: 'DTRACK_URL',      vaultKey: 'DTRACK_URL'],
+                                    [envVar: 'DTRACK_API_KEY',  vaultKey: 'DTRACK_API_KEY']
                                 ]
                             ]
                         ]
                     ) {
                         sh 'mkdir -p dependency-check-report'
                         sh 'uv export --project app --no-dev --format requirements-txt -o dependency-check-report/pinned-deps.txt'
-                        sh 'uv run --project ci cyclonedx-py requirements dependency-check-report/pinned-deps.txt --pyproject app/pyproject.toml -o dependency-check-report/sbom.xml --of XML'
-                        dependencyCheck(
-                            additionalArguments: '--scan dependency-check-report/sbom.xml --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
-                            odcInstallation: 'owasp dependency check 12.2.2'
-                        )
+                        sh 'uvx cyclonedx-py requirements dependency-check-report/pinned-deps.txt --pyproject app/pyproject.toml -o dependency-check-report/sbom.xml --of XML'
+                        sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=wallet-tracker-api" -F "projectVersion=0.1.0" -F "bom=@dependency-check-report/sbom.xml"'
 
                         def scannerHome = tool 'SonarScanner'
                         withSonarQubeEnv() {
@@ -70,8 +68,7 @@ pipeline {
             }
             post {
                 always {
-                    archiveArtifacts artifacts: 'dependency-check-report/**/*', allowEmptyArchive: true
-                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
+                    archiveArtifacts artifacts: 'dependency-check-report/sbom.xml', allowEmptyArchive: true
                 }
             }
         }
