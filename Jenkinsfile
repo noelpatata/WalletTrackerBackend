@@ -31,7 +31,7 @@ pipeline {
                                     [envVar: 'REGISTRY',        vaultKey: 'REGISTRY_IP'],
                                     [envVar: 'DOCKER_USERNAME', vaultKey: 'REGISTRY_USER'],
                                     [envVar: 'DOCKER_PASSWORD', vaultKey: 'REGISTRY_PASSWORD'],
-                                    [envVar: 'DTRACK_BASE_URL',      vaultKey: 'DTRACK_BASE_URL'],
+                                    [envVar: 'DTRACK_URL',      vaultKey: 'DTRACK_BASE_URL'],
                                     [envVar: 'DTRACK_API_KEY',  vaultKey: 'DTRACK_API_KEY']
                                 ]
                             ]
@@ -40,7 +40,7 @@ pipeline {
                         sh 'mkdir -p dependency-check-report'
                         sh 'uv export --project app --no-dev --format requirements-txt -o dependency-check-report/pinned-deps.txt'
                         sh 'uvx cyclonedx-py requirements dependency-check-report/pinned-deps.txt --pyproject app/pyproject.toml -o dependency-check-report/sbom.xml --of XML'
-                        sh 'curl -s -X POST "${DTRACK_BASE_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=wallet-tracker-api" -F "projectVersion=0.1.0" -F "bom=@dependency-check-report/sbom.xml"'
+                        sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=wallet-tracker-api" -F "projectVersion=0.1.0" -F "bom=@dependency-check-report/sbom.xml"'
 
                         sh 'python3 dtrack-to-sonarqube.py'
 
