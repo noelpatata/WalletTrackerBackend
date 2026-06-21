@@ -5,7 +5,7 @@ pytestmark = pytest.mark.e2e
 
 
 def test_health(base_url):
-        response = requests.get(f"{base_url}/api/v1/health", timeout=10)
+    response = requests.get(f"{base_url}/api/v1/health", timeout=10)
     assert response.status_code == 200
 
 
