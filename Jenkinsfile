@@ -37,9 +37,13 @@ pipeline {
                             ]
                         ]
                     ) {
+                        def imageTag = params.IMAGE_VERSION
+                        def imageRef = "\${REGISTRY}/wallet-tracker:${imageTag}"
+
+                        sh 'docker build -t ' + imageRef + ' ./app'
+
                         sh 'mkdir -p dependency-check-report'
-                        sh 'uv export --project app --no-dev --format requirements-txt -o dependency-check-report/pinned-deps.txt'
-                        sh 'uvx cyclonedx-py requirements dependency-check-report/pinned-deps.txt --pyproject app/pyproject.toml -o dependency-check-report/sbom.xml --of XML'
+                        sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock anchore/syft ' + imageRef + ' -o cyclonedx-xml > dependency-check-report/sbom.xml'
                         sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=wallet-tracker-api" -F "projectVersion=0.1.0" -F "bom=@dependency-check-report/sbom.xml"'
 
                         sh 'python3 dtrack-to-sonarqube.py'
@@ -49,10 +53,8 @@ pipeline {
                             sh "${scannerHome}/bin/sonar-scanner -Dsonar.externalIssuesReportPaths=dependency-check-report/dtrack-findings.json"
                         }
 
-                        def imageTag = params.IMAGE_VERSION
-                        sh 'docker build -t ${REGISTRY}/wallet-tracker:' + imageTag + ' ./app'
                         sh 'echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin' +
-                           ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
+                           ' && docker push ' + imageRef +
                            ' && docker logout ${REGISTRY}'
 
                         dir('terraform') {
