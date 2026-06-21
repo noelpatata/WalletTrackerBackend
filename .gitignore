@@ -5,7 +5,6 @@ __pycache__
 .env/
 app/.pytest.env
 .venv/
-ci/.venv/
 uv.lock
 *.pem
 *.log
