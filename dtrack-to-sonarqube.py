@@ -124,13 +124,13 @@ def main():
 
     if not base or not key:
         print("ERROR: DTRACK_URL and DTRACK_API_KEY must be set", file=sys.stderr)
-        sys.exit(0)
+        sys.exit(1)
 
     print(f"Looking up project {proj}@{vers} ...", file=sys.stderr)
     puid = get_project_uuid(base, key, proj, vers)
     if not puid:
         print(f"WARNING: Project {proj}@{vers} not found in Dependency-Track", file=sys.stderr)
-        sys.exit(0)
+        sys.exit(1)
 
     print(f"Project UUID: {puid}", file=sys.stderr)
     findings = get_findings(base, key, puid)
