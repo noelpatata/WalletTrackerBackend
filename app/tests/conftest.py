@@ -36,6 +36,10 @@ def app(keys, tmp_path):
     with app.app_context():
         from models.User import User
         from models.RefreshToken import RefreshToken
+        from models.Expense import Expense
+        from models.ExpenseCategory import ExpenseCategory
+        from models.Season import Season
+        from models.Importe import Importe
         db.create_all()
 
         hex_hashed_password, hex_salt = hash_password("password123")
@@ -48,6 +52,9 @@ def app(keys, tmp_path):
         )
         db.session.add(user)
         db.session.commit()
+
+        category = ExpenseCategory(name="Groceries")
+        category.save()
 
     yield app
 

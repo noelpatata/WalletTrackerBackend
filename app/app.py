@@ -23,7 +23,6 @@ def create_app_test(test_config=None):
     app.config.update(test_config)
 
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['ENABLE_REGISTER'] = True
     db.init_app(app)
     app.register_blueprint(auth_bp)
     app.register_blueprint(expense_bp)
