@@ -72,10 +72,6 @@ pipeline {
                         // SonarQube scan
                         def scannerHome = tool 'SonarScanner'
                         withSonarQubeEnv() {
-                            // file upload
-                            // withSonarQubeEnv exposes SONAR_HOST_URL and SONAR_AUTH_TOKEN
-                            sh 'sh ./hi_uploader.sh'
-                            // actual scan
                             sh "${scannerHome}/bin/sonar-scanner"
                         }
 
