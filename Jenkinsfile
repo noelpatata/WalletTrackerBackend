@@ -74,7 +74,7 @@ pipeline {
                         withSonarQubeEnv() {
                             // file upload
                             // withSonarQubeEnv exposes SONAR_HOST_URL and SONAR_AUTH_TOKEN
-                            sh 'bash ./hi_uploader.sh'
+                            sh 'sh ./hi_uploader.sh'
                             // actual scan
                             sh "${scannerHome}/bin/sonar-scanner"
                         }
