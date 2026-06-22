@@ -101,6 +101,7 @@ def convert(manifest_path, findings):
             }
 
         issues.append({
+            "engineId": "dependency-track",
             "ruleId": vuln_id,
             "effortMinutes": 0,
             "primaryLocation": {
@@ -111,7 +112,7 @@ def convert(manifest_path, findings):
             "severity": SEVERITY_MAP.get(severity.upper(), "INFO"),
         })
 
-    return {"rules": list(rules.values()), "issues": issues}
+    return {"issues": issues}
 
 
 def main():
