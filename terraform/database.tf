@@ -11,7 +11,7 @@ variable "wallettracker_mariadb_database" {
 variable "db_volume" {
   description = "Host directory to bind-mount as /var/lib/mysql"
   type        = string
-  default     = "/mnt/mariadb_wallettracker"
+  default     = "/mnt/mariadb_wallettracker_v2"
 }
 variable "storage_name" {
   description = "Rootfs storage for container"
@@ -20,6 +20,9 @@ variable "storage_name" {
 }
 
 resource "null_resource" "ensure_mariadb_volume" {
+  triggers = {
+    db_volume = var.db_volume
+  }
   connection {
     type     = "ssh"
     user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
@@ -71,7 +74,6 @@ resource "proxmox_lxc" "mariadb" {
   start = true
   lifecycle {
     create_before_destroy = true
-    ignore_changes        = [mountpoint]
   }
 }
 
