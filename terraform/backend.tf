@@ -14,7 +14,7 @@ locals {
 
     directory="${local.repo_path}/app"
     pidfile="/run/wallettracker.pid"
-    command="/usr/bin/uwsgi"
+    command="/srv/WalletTrackerAPI/app/.venv/bin/uwsgi"
     command_args="--ini $${directory}/uwsgi.ini --logto2 /var/log/wallettracker.log"
     command_background="yes"
 
@@ -79,7 +79,7 @@ resource "null_resource" "setup_api_in_container" {
       pct exec ${local.api_vmid} -- sh -c "apk add --no-cache git python3 py3-pip mariadb-dev gcc musl-dev python3-dev build-base linux-headers uv"
 
       pct exec ${local.api_vmid} -- rm -rf ${local.repo_path}
-      pct exec ${local.api_vmid} -- git clone https://github.com/noelpatata/WalletTrackerAPI.git ${local.repo_path}
+      pct exec ${local.api_vmid} -- git clone https://github.com/noelpatata/WalletTrackerBackend.git ${local.repo_path}
 
       pct exec ${local.api_vmid} -- uv sync --no-dev --no-install-project --project ${local.repo_path}/app
 
