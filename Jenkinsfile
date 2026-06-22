@@ -57,8 +57,7 @@ pipeline {
 
                         sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=' + projName + '" -F "projectVersion=' + projVersion + '" -F "bom=@dependency-check-report/sbom-cyclonedx.xml"'
 
-                        sh 'pip install cyclonedx-bom 2>&1 | tail -1'
-                        sh 'cyclonedx-py requirements app/pyproject.toml > dependency-check-report/sbom-cyclonedx-pyonly.xml'
+                        sh 'docker run --rm --entrypoint sh ${REGISTRY}/wallet-tracker:' + imageTag + ' -c "pip install -q cyclonedx-bom && cyclonedx-py requirements /app/pyproject.toml" > dependency-check-report/sbom-cyclonedx-pyonly.xml'
                         sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=' + projName + '-py-deps" -F "projectVersion=' + projVersion + '" -F "bom=@dependency-check-report/sbom-cyclonedx-pyonly.xml"'
 
                         sh 'python3 dtrack-to-sonarqube.py'
