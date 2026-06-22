@@ -119,7 +119,7 @@ resource "null_resource" "deploy_api" {
       set -ex
       pct exec ${local.api_vmid} -- git -C ${local.repo_path} pull
 
-      pct exec ${local.api_vmid} -- UV_SYSTEM_PYTHON=1 uv sync --no-dev --no-install-project --project ${local.repo_path}/app
+      pct exec ${local.api_vmid} -- uv sync --no-dev --no-install-project --project ${local.repo_path}/app
 
       pct exec ${local.api_vmid} -- sh -c "export DATABASE_ROOT_PASSWORD='${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}'; export DATABASE_NAME='wallet_tracker'; export WALLET_TRACKER_DB_USER='root'; export WALLET_TRACKER_DB_HOST='${var.db_container_ip}'; python ${local.repo_path}/app/migrate_all.py"
 
