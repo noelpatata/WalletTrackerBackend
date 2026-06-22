@@ -81,11 +81,10 @@ resource "null_resource" "setup_api_in_container" {
       pct exec ${local.api_vmid} -- rm -rf ${local.repo_path}
       pct exec ${local.api_vmid} -- git clone https://github.com/noelpatata/WalletTrackerAPI.git ${local.repo_path}
 
-      pct exec ${local.api_vmid} -- UV_SYSTEM_PYTHON=1 uv sync --no-dev --no-install-project --project ${local.repo_path}/app
+      pct exec ${local.api_vmid} -- uv sync --no-dev --no-install-project --project ${local.repo_path}/app
 
       pct exec ${local.api_vmid} -- apk del gcc musl-dev build-base linux-headers
 
-      pct exec ${local.api_vmid} -- mkdir -p /var/logs
       pct exec ${local.api_vmid} -- touch /var/log/wallettracker.log
       pct exec ${local.api_vmid} -- chmod 644 /var/log/wallettracker.log
 
