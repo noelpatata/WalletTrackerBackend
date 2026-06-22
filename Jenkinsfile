@@ -31,24 +31,37 @@ pipeline {
                                     [envVar: 'REGISTRY',        vaultKey: 'REGISTRY_IP'],
                                     [envVar: 'DOCKER_USERNAME', vaultKey: 'REGISTRY_USER'],
                                     [envVar: 'DOCKER_PASSWORD', vaultKey: 'REGISTRY_PASSWORD'],
-                                    [envVar: 'NVD_API_KEY',     vaultKey: 'NVD_API_KEY']
+                                    [envVar: 'NVD_API_KEY',     vaultKey: 'NVD_API_KEY'],
+                                    [envVar: 'DTRACK_URL',      vaultKey: 'DTRACK_BASE_URL'],
+                                    [envVar: 'DTRACK_API_KEY',  vaultKey: 'DTRACK_API_KEY']
                                 ]
                             ]
                         ]
                     ) {
                         sh 'mkdir -p dependency-check-report'
+
                         dependencyCheck(
                             additionalArguments: '--scan app/pyproject.toml --enableExperimental --project wallet-tracker-api --format JSON --out dependency-check-report --nvdApiKey ${NVD_API_KEY}',
                             odcInstallation: 'owasp dependency check 12.2.2'
                         )
 
-                        def scannerHome = tool 'SonarScanner'
-                        withSonarQubeEnv() {
-                            sh "${scannerHome}/bin/sonar-scanner"
-                        }
-
                         def imageTag = params.IMAGE_VERSION
                         sh 'docker build -t ${REGISTRY}/wallet-tracker:' + imageTag + ' ./app'
+
+                        sh 'docker run --rm -v /var/run/docker.sock:/var/run/docker.sock anchore/syft ${REGISTRY}/wallet-tracker:' + imageTag + ' -o cyclonedx-xml > dependency-check-report/sbom-cyclonedx.xml'
+
+                        def projName = sh(script: "python3 -c \"import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])\"", returnStdout: true).trim()
+                        def projVersion = sh(script: "python3 -c \"import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])\"", returnStdout: true).trim()
+
+                        sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=' + projName + '" -F "projectVersion=' + projVersion + '" -F "bom=@dependency-check-report/sbom-cyclonedx.xml"'
+
+                        sh 'python3 dtrack-to-sonarqube.py'
+
+                        def scannerHome = tool 'SonarScanner'
+                        withSonarQubeEnv() {
+                            sh "${scannerHome}/bin/sonar-scanner -Dsonar.externalIssuesReportPaths=dependency-check-report/dtrack-findings.json"
+                        }
+
                         sh 'echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin' +
                            ' && docker push ${REGISTRY}/wallet-tracker:' + imageTag +
                            ' && docker logout ${REGISTRY}'

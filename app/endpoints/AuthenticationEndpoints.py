@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from flask import Blueprint, request, current_app
+from flask import Blueprint, request
 from utils.Cryptography import generate_private_key, generate_private_key_string, generate_public_key_string, decode_jwt_ignore_expiry, generate_access_token
 from utils.Constants import Messages, AuthMessages, UserMessages, TokenMessages
 from utils.Multitenant import create_tenant_user_and_db
@@ -12,7 +12,7 @@ from db import db
 from endpoints.middlewares.AuthMiddleware import token_required
 from exceptions.Http import HttpException
 from validators.FieldValidator import is_empty
-from config import REFRESH_TOKEN_EXPIRY_DAYS
+from config import REFRESH_TOKEN_EXPIRY_DAYS, ENABLE_REGISTER
 
 
 auth_bp = Blueprint('authentication', __name__)
@@ -49,7 +49,7 @@ def login():
 @auth_bp.route("/api/v1/register/", methods=['POST'])
 def register():
     try:
-        if not current_app.config['ENABLE_REGISTER']:
+        if not ENABLE_REGISTER.lower() == "true":
             return make_response(None, False, Messages.INVALID_REQUEST), 403
             
         data = request.get_json()
