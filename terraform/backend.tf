@@ -107,8 +107,6 @@ resource "null_resource" "deploy_api" {
     always_run = timestamp()
   }
 
-  depends_on = [null_resource.setup_api_in_container, null_resource.deploy_mariadb]
-
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
