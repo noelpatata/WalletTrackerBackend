@@ -1,0 +1,2 @@
+Hello from WalletTrackerAPI!
+This text will appear in the SonarQube "hi" tab when uploaded by the scanner helper.
