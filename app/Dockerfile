@@ -27,6 +27,5 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY . .
 
-ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 5000
 CMD ["uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]
