@@ -60,11 +60,9 @@ pipeline {
                         sh 'docker run --rm -v "$(pwd)/dependency-check-report:/reports" --entrypoint sh ${REGISTRY}/wallet-tracker:' + imageTag + ' -c "pip install -q cyclonedx-bom 2>/dev/null && cyclonedx-py environment > /reports/sbom-cyclonedx-pyonly.xml"'
                         sh 'curl -s -X POST "${DTRACK_URL}/api/v1/bom" -H "X-Api-Key: ${DTRACK_API_KEY}" -H "Content-Type: multipart/form-data" -F "projectName=' + projName + '-py-deps" -F "projectVersion=' + projVersion + '" -F "bom=@dependency-check-report/sbom-cyclonedx-pyonly.xml"'
 
-                        sh 'python3 dtrack-to-sonarqube.py'
-
                         def scannerHome = tool 'SonarScanner'
                         withSonarQubeEnv() {
-                            sh "${scannerHome}/bin/sonar-scanner -Dsonar.externalIssuesReportPaths=dependency-check-report/dtrack-findings.json"
+                            sh "${scannerHome}/bin/sonar-scanner"
                         }
 
                         sh 'echo "${DOCKER_PASSWORD}" | docker login ${REGISTRY} -u "${DOCKER_USERNAME}" --password-stdin' +
