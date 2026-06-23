@@ -6,7 +6,7 @@ class AppLogger:
     _logger = None
 
     @staticmethod
-    def configure(log_file: str = None):
+    def configure(log_file: str | None = None):
         handlers = [logging.StreamHandler(sys.stdout)]
 
         if log_file:
