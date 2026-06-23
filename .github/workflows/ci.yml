@@ -144,7 +144,7 @@ jobs:
         run: |
           PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
           PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
-          RESPONSE=$(curl -s -X POST "$DT_URL/api/v1/bom" \
+          RESPONSE=$(curl -s --max-time 120 -X POST "$DT_URL/api/v1/bom" \
             -H "X-Api-Key: $DT_API_KEY" \
             -F "projectName=$PROJ_NAME" \
             -F "projectVersion=$PROJ_VERSION" \
