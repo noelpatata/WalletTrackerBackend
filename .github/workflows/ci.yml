@@ -131,9 +131,7 @@ jobs:
       - name: Generate SBOM with Syft
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
-          PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
-          syft dir:./app --name "$PROJ_NAME" --source-version "$PROJ_VERSION" -o cyclonedx-json > bom.json
+          syft dir:./app -o cyclonedx-json > bom.json
 
       - name: Submit SBOM to Dependency Track
         id: sbom
