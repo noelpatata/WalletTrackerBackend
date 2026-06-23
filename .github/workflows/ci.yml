@@ -46,6 +46,7 @@ jobs:
             secret/data/wallet-tracker/backend SONAR_HOST_URL ;
             secret/data/wallet-tracker/backend DT_URL ;
             secret/data/wallet-tracker/backend DT_API_KEY ;
+            secret/data/wallet-tracker/backend DT_PROJECT_GUID ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
       - name: SonarQube Analysis
@@ -100,43 +101,37 @@ jobs:
           RESPONSE=$(curl -s -X PUT "${{ env.DT_URL }}/api/v1/bom" \
             -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"projectName\":\"wallet-tracker-api\",\"projectVersion\":\"pr-${{ github.event.number }}\",\"bom\":\"${BOM}\"}")
+            -d "{\"project\":\"${{ env.DT_PROJECT_GUID }}\",\"projectName\":\"wallet-tracker-api\",\"projectVersion\":\"pr-${{ github.event.number }}\",\"bom\":\"${BOM}\"}")
           echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
 
-      - name: Wait for Dependency Track Processing
+      - name: Wait for DT Processing & Check Policy
         run: |
           TOKEN="${{ steps.sbom.outputs.bom-token }}"
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
-              "${{ env.DT_URL }}/api/v1/bom/token/${TOKEN}" | jq -r '.processing')
-            if [ "$STATUS" = "false" ]; then
-              echo "SBOM processed."
+          for i in $(seq 1 60); do
+            RESPONSE=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+              "${{ env.DT_URL }}/api/v1/bom/token/${TOKEN}")
+
+            PROCESSING=$(echo "$RESPONSE" | jq -r '.processing')
+            if [ "$PROCESSING" = "false" ]; then
+              VERSION_UUID=$(echo "$RESPONSE" | jq -r '.project.uuid')
+              echo "SBOM processed. Version UUID: ${VERSION_UUID}"
+
+              M=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+                "${{ env.DT_URL }}/api/v1/metrics/project/${VERSION_UUID}/current")
+
+              FAIL_COUNT=$(echo "$M" | jq -r '.policyViolationsFail // 0')
+              echo "Policy violations (FAIL): $FAIL_COUNT"
+
+              if [ "$FAIL_COUNT" -gt 0 ]; then
+                echo "DT policy violations found — PR blocked."
+                exit 1
+              fi
+
+              echo "All DT checks passed."
               exit 0
             fi
-            echo "Waiting... attempt $i"
+            echo "Waiting for DT processing... attempt $i"
             sleep 5
           done
           echo "Timed out."
           exit 1
-
-      - name: Check Policy Violations
-        run: |
-          UUID=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
-            "${{ env.DT_URL }}/api/v1/project?name=wallet-tracker-api&version=pr-${{ github.event.number }}" | \
-            jq -r '.[0].uuid')
-
-          V=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
-            "${{ env.DT_URL }}/api/v1/violation/project/${UUID}")
-
-          CRIT=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "CRITICAL")] | length')
-          HIGH=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "HIGH")] | length')
-          MED=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "MEDIUM")] | length')
-
-          echo "CRITICAL: $CRIT  HIGH: $HIGH  MEDIUM: $MED"
-
-          if [ "$CRIT" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MED" -gt 0 ]; then
-            echo "Violations found — PR blocked."
-            exit 1
-          fi
-
-          echo "All checks passed."
