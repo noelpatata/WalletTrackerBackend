@@ -13,11 +13,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen
-
-RUN apk del gcc musl-dev build-base linux-headers
+RUN uv sync --frozen \
+&& apk del gcc musl-dev build-base linux-headers
 
 COPY . .
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app
+
+USER appuser
 
 EXPOSE 5000
 CMD ["uv", "run", "--frozen", "uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]
