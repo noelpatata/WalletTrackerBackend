@@ -25,6 +25,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app/uv.lock /app/uv.lock
 COPY --from=builder /usr/bin/uv /usr/local/bin/uv
 
 COPY . .
