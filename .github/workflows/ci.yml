@@ -26,9 +26,11 @@ jobs:
 
       - run: docker compose up -d --build
 
-      - run: docker compose exec -T app uv run pytest --cov=app --cov-report=xml --cov-report=term -v
+      - run: docker compose exec -T app uv run pytest --cov=. --omit='tests/*' --cov-report=xml --cov-report=term -v
 
-      - run: docker compose cp app:/app/coverage.xml ./coverage.xml && sed -i 's|/app/||g' coverage.xml
+      - run: docker compose cp app:/app/coverage.xml ./coverage.xml && sed -i 's|<source>/app</source>|<source>app</source>|g' coverage.xml
+
+      - run: head -100 coverage.xml
 
       - if: always()
         run: docker compose down --volumes
@@ -62,6 +64,8 @@ jobs:
             secret/data/wallet-tracker/backend DT_API_KEY ;
             secret/data/wallet-tracker/backend DT_PROJECT_UUID ;
             secret/data/wallet-tracker/backend NVD_API_KEY
+
+      - run: ls -la coverage.xml && head -100 coverage.xml
 
       - name: SonarQube Analysis
         uses: SonarSource/sonarqube-scan-action@v5
