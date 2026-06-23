@@ -1,56 +1,111 @@
-# Python Code Coverage
+# How Python Coverage Works
 
-This project uses **pytest-cov** (powered by coverage.py) to measure line coverage, and **SonarQube** to gate PR merges based on the coverage quality gate.
+## 1. How coverage.py measures coverage
 
-## Tools
+coverage.py uses Python's tracing infrastructure -- `sys.settrace()` (or `sys.monitoring` in 3.12+) -- to hook into the interpreter at the function/line level.
 
-| Tool | Role |
-|------|------|
-| [pytest-cov](https://github.com/pytest-dev/pytest-cov) | pytest plugin that runs coverage.py during tests |
-| [coverage.py](https://coverage.readthedocs.io/) | Python line-coverage measurement engine |
-| [SonarQube](https://www.sonarsource.com/products/sonarqube/) | Quality gate enforcement and coverage visualization |
+When tracing is enabled:
+- Every line executed fires a trace callback. coverage.py records which `file:line` was hit.
+- At the end, it parses each source file with Python's `ast` module to determine **which lines are actually executable** (comments, blank lines, docstrings, pure decorators are excluded).
+- **Coverage % = (lines hit) / (executable lines) * 100**
 
-## Pipeline Flow
+`omit = ["tests/*"]` excludes test code from the metric.
 
-Tests run inside a Docker container via GitHub Actions. The coverage pipeline follows four stages:
+**Example:** `app/app.py` has 51 executable statements. If tests exercise 27 of them, coverage = 27/51 = 53%.
 
-```
-pytest --cov=.   ──►  coverage.xml  ──►  SonarQube Scanner  ──►  Quality Gate
-```
+---
 
-### 1. Run tests with coverage (inside container)
+## 2. How the report is generated
 
-In `.github/workflows/ci.yml`:
-
-```yaml
-- run: docker compose exec -T app uv run pytest --cov=. --cov-report=xml --cov-report=term -v
+```bash
+docker compose exec -T app uv run pytest --cov=. --cov-report=xml --cov-report=term -v
 ```
 
-- `--cov=.` — measure coverage for all files in `/app/` (the working directory inside the container).
-- `--cov-report=xml` — write Cobertura XML to `coverage.xml`.
-- `--cov-report=term` — print a summary table to stdout.
+Runs **inside the container** (`WORKDIR=/app`). The chain:
 
-Test files are excluded from coverage by the `omit` setting in `app/pyproject.toml`:
+1. pytest collects tests from `tests/` (mounted via docker-compose volume)
+2. pytest-cov plugin starts the coverage tracer before the first test
+3. All tests run -- every line in `app/*.py` that executes increments its hit counter
+4. After tests finish, the tracer stops
+5. `--cov-report=xml` writes `/app/coverage.xml` (Cobertura XML format)
+6. `--cov-report=term` prints the summary table to stdout
 
-```toml
-[tool.coverage.run]
-relative_files = true
-omit = ["tests/*"]
+### Cobertura XML structure (simplified)
+
+```xml
+<coverage line-rate="0.75">
+  <sources>
+    <source>/app</source>
+  </sources>
+  <packages>
+    <package name="endpoints" line-rate="0.81">
+      <classes>
+        <class name="AuthenticationEndpoints.py" filename="endpoints/AuthenticationEndpoints.py" line-rate="1.0">
+          <lines>
+            <line number="10" hits="5"/>
+            <line number="11" hits="0"/>   <!-- missed -->
+          </lines>
+        </class>
+      </classes>
+    </package>
+  </packages>
+</coverage>
 ```
 
-The `relative_files = true` flag makes coverage.py output paths relative to the working directory, which is required for correct parsing by SonarQube.
+Every line in every `.py` file gets a `<line>` entry with a hit count. `hits="0"` = uncovered.
 
-### 2. Copy and fix paths
+---
 
-```yaml
-- run: docker compose cp app:/app/coverage.xml ./coverage.xml
-  && sed -i 's|<source>/app</source>|<source>app</source>|g;
-             s|<source>\.</source>|<source>app</source>|g' coverage.xml
+## 3. The path fix (why sed is needed)
+
+Inside the container, `<source>/app</source>` is correct -- files are at `/app/app.py`, `/app/endpoints/AuthenticationEndpoints.py`, etc.
+
+On the **GitHub runner**, the repo is at `/home/runner/work/WalletTrackerAPI/WalletTrackerAPI/`. The path `/app` doesn't exist there.
+
+```bash
+sed -i 's|<source>/app</source>|<source>app</source>|g; s|<source>\.</source>|<source>app</source>|g' coverage.xml
 ```
 
-The coverage report is generated inside the container with a `<source>` element pointing to `/app/` (the in-container working directory). This path doesn't exist on the GitHub runner, so the `sed` command rewrites it to `app` (relative to the repository root). This makes SonarQube resolve `app.py` → `app/app.py`, matching the `sonar.sources=app` setting.
+Rewrites `<source>/app</source>` to `<source>app</source>` (relative). SonarQube then resolves `endpoints/AuthenticationEndpoints.py` to `<repo_root>/app/endpoints/AuthenticationEndpoints.py`, matching `sonar.sources=app`.
 
-### 3. Upload as artifact
+---
+
+## 4. How SonarQube interprets the data
+
+```properties
+sonar.python.coverage.reportPaths=coverage.xml
+sonar.sources=app
+```
+
+SonarQube's scanner:
+
+1. **Parses the Cobertura XML** -- reads each `<class>` filename and its per-line hits
+2. **Maps filenames** -- combines `<source>app</source>` + `filename` attribute to `app/app.py`, `app/endpoints/AuthenticationEndpoints.py`
+3. **Cross-references** against files found under `sonar.sources=app` in the checked-out repo
+4. **Loads coverage data** per file -- each line is green (hit), yellow (partial branch), or red (missed). Drives the UI visualization.
+5. **Computes the quality gate** -- if overall line coverage is below the project threshold, the gate fails and the PR is blocked.
+
+**SonarQube does NOT run the tests.** It only imports the pre-generated XML. It is purely a consumer of coverage data, not a producer.
+
+---
+
+## 5. CI pipeline flow
+
+```text
+[container] pytest --cov=.          -->  coverage.xml (Cobertura)
+                                              |
+                                       sed fix paths
+                                              |
+                                      upload as artifact
+                                              |
+[security-checks job] download artifact      |
+                                              |
+                                      SonarQube Scanner
+                                              |
+                                          Quality Gate
+```
+
+### Upload as artifact
 
 ```yaml
 - if: always()
@@ -60,11 +115,7 @@ The coverage report is generated inside the container with a `<source>` element 
     path: coverage.xml
 ```
 
-The fixed `coverage.xml` is uploaded as a workflow artifact so the downstream `security-checks` job can consume it.
-
-### 4. SonarQube analysis
-
-The `security-checks` job downloads the artifact and runs the SonarQube scanner:
+### Download and scan
 
 ```yaml
 - uses: actions/download-artifact@v4
@@ -75,91 +126,36 @@ The `security-checks` job downloads the artifact and runs the SonarQube scanner:
   uses: SonarSource/sonarqube-scan-action@v5
 ```
 
-The scanner reads `sonar-project.properties`, which tells it where to find coverage data:
+### Wait for CE task (quality gate check)
 
-```properties
-sonar.python.coverage.reportPaths=coverage.xml
-sonar.sources=app
-sonar.tests=tests
-sonar.test.exclusions=tests/**
-```
+The scan triggers an async Compute Engine (CE) task on the SonarQube server. The CI:
 
-### 5. Quality gate check
+1. Calls `/api/ce/component?componentKey=$KEY` to get the current task ID
+2. Polls `/api/ce/task?id=$TASK_ID` until `status = SUCCESS`
+3. Calls `/api/qualitygates/project_status?projectKey=$KEY` to read gate status
 
-After the scanner uploads the report, a Compute Engine (CE) task processes it on the SonarQube server. The CI waits for this task to finish before checking the gate:
+This avoids reading a stale gate result from a previous analysis.
+
+---
+
+## Key files
+
+| File | Purpose |
+|------|---------|
+| `app/pyproject.toml` | Coverage config: `relative_files = true`, `omit = ["tests/*"]` |
+| `.github/workflows/ci.yml` | Full pipeline definition |
+| `sonar-project.properties` | `sonar.python.coverage.reportPaths=coverage.xml`, `sonar.sources=app` |
+| `docker-compose.yml` | Mounts `./tests:/app/tests` at runtime |
+
+## Running coverage locally
 
 ```bash
-# Wait for CE task to complete
-TASK_ID=$(curl ... /api/ce/component?componentKey=$PROJECT_KEY | jq -r '.current[0].id // .queue[0].id')
-# Poll /api/ce/task?id=$TASK_ID until status = SUCCESS
-# Then check /api/qualitygates/project_status
-```
-
-This avoids reading a stale quality gate from a previous analysis.
-
-## Directory Layout
-
-```
-.
-├── .github/workflows/ci.yml     # CI pipeline
-├── app/
-│   ├── pyproject.toml            # coverage.py config + pytest config
-│   ├── Dockerfile                # WORKDIR /app
-│   └── ...                       # application source (app.py, endpoints/, ...)
-├── tests/                        # test suite (mounted into container at /app/tests)
-├── docker-compose.yml            # volumes: - ./tests:/app/tests
-└── sonar-project.properties      # SonarQube analysis parameters
-```
-
-Tests live outside `app/` to keep the production image lean. They are mounted into the container at runtime via a Docker Compose volume:
-
-```yaml
-services:
-  app:
-    volumes:
-      - ./tests:/app/tests
-```
-
-## Running Coverage Locally
-
-```sh
 docker compose exec app uv run pytest --cov=. --cov-report=term -v
 ```
 
-Output example:
+HTML report for browsing:
 
-```
-Name                                   Stmts   Miss  Cover
-----------------------------------------------------------
-app.py                                    51     24    53%
-endpoints/AuthenticationEndpoints.py      98      0   100%
-...
-----------------------------------------------------------
-TOTAL                                     412    102    75%
-```
-
-To generate an HTML report for browsing:
-
-```sh
+```bash
 docker compose exec app uv run pytest --cov=. --cov-report=html -v
 # open htmlcov/index.html
-```
-
-## Configuration Reference
-
-### `app/pyproject.toml` — coverage.py
-
-```toml
-[tool.coverage.run]
-relative_files = true    # report paths relative to working dir
-omit = ["tests/*"]       # exclude test code from metrics
-```
-
-### `sonar-project.properties` — SonarQube
-
-```properties
-sonar.sources=app                          # source root (resolves app.py → app/app.py)
-sonar.python.coverage.reportPaths=coverage.xml  # path to Cobertura XML
-sonar.tests=tests                          # test directory
-sonar.test.exclusions=tests/**             # exclude tests from source analysis
 ```
