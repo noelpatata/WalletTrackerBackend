@@ -25,6 +25,7 @@ dev = [
 ]
 
 [tool.coverage.run]
+relative_files = true
 omit = ["tests/*"]
 
 [tool.pytest.ini_options]

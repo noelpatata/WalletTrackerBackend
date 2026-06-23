@@ -28,7 +28,7 @@ jobs:
 
       - run: docker compose exec -T app uv run pytest --cov=. --cov-report=xml --cov-report=term -v
 
-      - run: docker compose cp app:/app/coverage.xml ./coverage.xml && sed -i 's|<source>/app</source>|<source>app</source>|g' coverage.xml
+      - run: docker compose cp app:/app/coverage.xml ./coverage.xml && sed -i 's|<source>/app</source>|<source>app</source>|g; s|<source>\.</source>|<source>app</source>|g' coverage.xml
 
       - run: head -100 coverage.xml
 
