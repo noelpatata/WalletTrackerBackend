@@ -13,8 +13,6 @@ When tracing is enabled:
 
 **Example:** `app/app.py` has 51 executable statements. If tests exercise 27 of them, coverage = 27/51 = 53%.
 
----
-
 ## 2. How the report is generated
 
 ```bash
@@ -54,8 +52,6 @@ Runs **inside the container** (`WORKDIR=/app`). The chain:
 
 Every line in every `.py` file gets a `<line>` entry with a hit count. `hits="0"` = uncovered.
 
----
-
 ## 3. The path fix (why sed is needed)
 
 Inside the container, `<source>/app</source>` is correct -- files are at `/app/app.py`, `/app/endpoints/AuthenticationEndpoints.py`, etc.
@@ -67,8 +63,6 @@ sed -i 's|<source>/app</source>|<source>app</source>|g; s|<source>\.</source>|<s
 ```
 
 Rewrites `<source>/app</source>` to `<source>app</source>` (relative). SonarQube then resolves `endpoints/AuthenticationEndpoints.py` to `<repo_root>/app/endpoints/AuthenticationEndpoints.py`, matching `sonar.sources=app`.
-
----
 
 ## 4. How SonarQube interprets the data
 
@@ -86,8 +80,6 @@ SonarQube's scanner:
 5. **Computes the quality gate** -- if overall line coverage is below the project threshold, the gate fails and the PR is blocked.
 
 **SonarQube does NOT run the tests.** It only imports the pre-generated XML. It is purely a consumer of coverage data, not a producer.
-
----
 
 ## 5. CI pipeline flow
 
@@ -135,8 +127,6 @@ The scan triggers an async Compute Engine (CE) task on the SonarQube server. The
 3. Calls `/api/qualitygates/project_status?projectKey=$KEY` to read gate status
 
 This avoids reading a stale gate result from a previous analysis.
-
----
 
 ## Key files
 
