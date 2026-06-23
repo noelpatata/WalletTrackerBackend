@@ -133,6 +133,12 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
           syft dir:./app -o cyclonedx-json > bom.json
 
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: bom.json
+
       - name: Submit SBOM to Dependency Track
         id: sbom
         run: |
