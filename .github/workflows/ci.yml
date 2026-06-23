@@ -137,15 +137,13 @@ jobs:
       - name: Submit SBOM to Dependency Track
         id: sbom
         run: |
-          PROJECT_GUID="${{ env.DT_PROJECT_GUID }}"
-          PR_NUMBER="${{ github.event.number }}"
           {
-            printf '{"project":"%s","projectName":"wallet-tracker-api","projectVersion":"pr-%s","bom":"' "$PROJECT_GUID" "$PR_NUMBER"
+            printf '{"project":"%s","projectName":"wallet-tracker-api","projectVersion":"pr-%s","bom":"' "$DT_PROJECT_UUID" "${{ github.event.number }}"
             base64 -w0 bom.json
             printf '"}'
           } > bom_payload.json
-          RESPONSE=$(curl -s -X PUT "${{ env.DT_URL }}/api/v1/bom" \
-            -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+          RESPONSE=$(curl -s -X PUT "$DT_URL/api/v1/bom" \
+            -H "X-Api-Key: $DT_API_KEY" \
             -H "Content-Type: application/json" \
             -d @bom_payload.json)
           echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
@@ -154,16 +152,16 @@ jobs:
         run: |
           TOKEN="${{ steps.sbom.outputs.bom-token }}"
           for i in $(seq 1 60); do
-            RESPONSE=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
-              "${{ env.DT_URL }}/api/v1/bom/token/${TOKEN}")
+            RESPONSE=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
+              "$DT_URL/api/v1/bom/token/${TOKEN}")
 
             PROCESSING=$(echo "$RESPONSE" | jq -r '.processing')
             if [ "$PROCESSING" = "false" ]; then
               VERSION_UUID=$(echo "$RESPONSE" | jq -r '.project.uuid')
               echo "SBOM processed. Version UUID: ${VERSION_UUID}"
 
-              M=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
-                "${{ env.DT_URL }}/api/v1/metrics/project/${VERSION_UUID}/current")
+              M=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
+                "$DT_URL/api/v1/metrics/project/${VERSION_UUID}/current")
 
               FAIL_COUNT=$(echo "$M" | jq -r '.policyViolationsFail // 0')
               echo "Policy violations (FAIL): $FAIL_COUNT"
