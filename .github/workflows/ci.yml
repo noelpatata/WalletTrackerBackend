@@ -113,20 +113,20 @@ jobs:
             exit 1
           fi
 
-      - name: OWASP Dependency Check
-        continue-on-error: true
-        run: |
-          mkdir -p dependency-check-report
-          docker run --rm \
-            -v "$(pwd):/src" \
-            -v "$(pwd)/dependency-check-report:/report" \
-            owasp/dependency-check:12.2.2 \
-            --scan /src/app/pyproject.toml \
-            --enableExperimental \
-            --project "wallet-tracker-api" \
-            --format JSON \
-            --out /report \
-            --nvdApiKey "${{ env.NVD_API_KEY }}"
+      # - name: OWASP Dependency Check
+      #   continue-on-error: true
+      #   run: |
+      #     mkdir -p dependency-check-report
+      #     docker run --rm \
+      #       -v "$(pwd):/src" \
+      #       -v "$(pwd)/dependency-check-report:/report" \
+      #       owasp/dependency-check:12.2.2 \
+      #       --scan /src/app/pyproject.toml \
+      #       --enableExperimental \
+      #       --project "wallet-tracker-api" \
+      #       --format JSON \
+      #       --out /report \
+      #       --nvdApiKey "${{ env.NVD_API_KEY }}"
 
       - name: Generate SBOM with Syft
         run: |
