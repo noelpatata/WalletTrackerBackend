@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -20,15 +20,123 @@ jobs:
           WALLET_TRACKER_SECRET=secret
           WALLET_TRACKER_DB_USER=root
           WALLET_TRACKER_DB_HOST=db
-          ENABLE_REGISTER=true
-          COMPOSE_PROFILES=db,app
+          COMPOSE_PROFILES=app, db
           EOF
 
       - run: docker compose up -d --build
 
-
-      - run: docker compose exec -T app pytest -v
+      - run: docker compose exec -T app uv run pytest -v
 
       - if: always()
         run: docker compose down --volumes
 
+  security-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch secrets from Vault
+        uses: hashicorp/vault-action@v3
+        with:
+          url: https://vault.downops.win
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/wallet-tracker/backend SONAR_TOKEN ;
+            secret/data/wallet-tracker/backend SONAR_HOST_URL ;
+            secret/data/wallet-tracker/backend DT_URL ;
+            secret/data/wallet-tracker/backend DT_API_KEY ;
+            secret/data/wallet-tracker/backend NVD_API_KEY
+
+      - name: SonarQube Analysis
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+
+      - name: Check SonarQube Quality Gate
+        run: |
+          for i in $(seq 1 30); do
+            QG=$(curl -s -u "${{ env.SONAR_TOKEN }}:" \
+              "${{ env.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=noelpatata_WalletTrackerAPI_0cf0ca12-f6dd-434b-9dbd-b121383d2888" | \
+              jq -r '.projectStatus.status')
+            if [ "$QG" = "OK" ]; then
+              echo "Quality Gate passed."
+              exit 0
+            elif [ "$QG" = "ERROR" ]; then
+              echo "Quality Gate failed — PR blocked."
+              exit 1
+            fi
+            echo "Waiting for analysis... attempt $i"
+            sleep 5
+          done
+          echo "Timed out."
+          exit 1
+
+      - name: OWASP Dependency Check
+        continue-on-error: true
+        run: |
+          mkdir -p dependency-check-report
+          docker run --rm \
+            -v "$(pwd):/src" \
+            -v "$(pwd)/dependency-check-report:/report" \
+            owasp/dependency-check:12.2.2 \
+            --scan /src/app/pyproject.toml \
+            --enableExperimental \
+            --project "wallet-tracker-api" \
+            --format JSON \
+            --out /report \
+            --nvdApiKey "${{ env.NVD_API_KEY }}"
+
+      - name: Generate SBOM with Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft dir:./app -o cyclonedx-json > bom.json
+
+      - name: Submit SBOM to Dependency Track
+        id: sbom
+        run: |
+          BOM=$(base64 -w0 bom.json)
+          RESPONSE=$(curl -s -X PUT "${{ env.DT_URL }}/api/v1/bom" \
+            -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"projectName\":\"wallet-tracker-api\",\"projectVersion\":\"pr-${{ github.event.number }}\",\"bom\":\"${BOM}\"}")
+          echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Dependency Track Processing
+        run: |
+          TOKEN="${{ steps.sbom.outputs.bom-token }}"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+              "${{ env.DT_URL }}/api/v1/bom/token/${TOKEN}" | jq -r '.processing')
+            if [ "$STATUS" = "false" ]; then
+              echo "SBOM processed."
+              exit 0
+            fi
+            echo "Waiting... attempt $i"
+            sleep 5
+          done
+          echo "Timed out."
+          exit 1
+
+      - name: Check Policy Violations
+        run: |
+          UUID=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+            "${{ env.DT_URL }}/api/v1/project?name=wallet-tracker-api&version=pr-${{ github.event.number }}" | \
+            jq -r '.[0].uuid')
+
+          V=$(curl -s -H "X-Api-Key: ${{ env.DT_API_KEY }}" \
+            "${{ env.DT_URL }}/api/v1/violation/project/${UUID}")
+
+          CRIT=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "CRITICAL")] | length')
+          HIGH=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "HIGH")] | length')
+          MED=$(echo "$V" | jq '[.[] | select(.policyCondition.policy.severity == "MEDIUM")] | length')
+
+          echo "CRITICAL: $CRIT  HIGH: $HIGH  MEDIUM: $MED"
+
+          if [ "$CRIT" -gt 0 ] || [ "$HIGH" -gt 0 ] || [ "$MED" -gt 0 ]; then
+            echo "Violations found — PR blocked."
+            exit 1
+          fi
+
+          echo "All checks passed."
