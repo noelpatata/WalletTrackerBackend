@@ -78,28 +78,41 @@ jobs:
           PROJECT_KEY="noelpatata_WalletTrackerAPI_0cf0ca12-f6dd-434b-9dbd-b121383d2888"
           AUTH="-u ${{ env.SONAR_TOKEN }}:"
           BASE="${{ env.SONAR_HOST_URL }}"
+          # Wait for the CE task to complete, then check the gate
           for i in $(seq 1 60); do
-            QG=$(curl -s $AUTH "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | \
-              jq -r '.projectStatus.status')
-            if [ "$QG" = "OK" ]; then
-              echo "Quality Gate passed."
-              exit 0
-            elif [ "$QG" = "ERROR" ]; then
-              TASK=$(curl -s $AUTH "$BASE/api/ce/component?componentKey=$PROJECT_KEY")
-              CURRENT_ID=$(echo "$TASK" | jq -r '.current[0].id // empty')
-              if [ -n "$CURRENT_ID" ]; then
-                echo "Gate is ERROR but CE task $CURRENT_ID still running — waiting..."
-              else
-                echo "Quality Gate failed — PR blocked."
-                exit 1
+            TASK_RESP=$(curl -s $AUTH "$BASE/api/ce/component?componentKey=$PROJECT_KEY")
+            TASK_ID=$(echo "$TASK_RESP" | jq -r '.current[0].id // .queue[0].id // empty')
+            if [ -z "$TASK_ID" ]; then
+              # No task found — analysis may have already finished; check gate directly
+              QG=$(curl -s $AUTH "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | jq -r '.projectStatus.status')
+              if [ "$QG" = "OK" ]; then
+                echo "Quality Gate passed."
+                exit 0
               fi
-            else
-              echo "Waiting for analysis... ($QG) attempt $i"
+              echo "Waiting for analysis... attempt $i"
+              sleep 5
+              continue
             fi
+            STATUS=$(curl -s $AUTH "$BASE/api/ce/task?id=$TASK_ID" | jq -r '.task.status')
+            if [ "$STATUS" = "SUCCESS" ]; then
+              echo "Analysis completed."
+              break
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELED" ]; then
+              echo "Analysis $STATUS."
+              exit 1
+            fi
+            echo "Waiting for CE task $TASK_ID... ($STATUS) attempt $i"
             sleep 5
           done
-          echo "Timed out."
-          exit 1
+          # Gate check after CE task completed
+          QG=$(curl -s $AUTH "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | jq -r '.projectStatus.status')
+          if [ "$QG" = "OK" ]; then
+            echo "Quality Gate passed."
+            exit 0
+          else
+            echo "Quality Gate failed — status: $QG"
+            exit 1
+          fi
 
       - name: OWASP Dependency Check
         continue-on-error: true
