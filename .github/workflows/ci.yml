@@ -68,18 +68,18 @@ jobs:
 
       - name: SonarQube Analysis
         id: sonar
-        uses: SonarSource/sonarqube-scan-action@v6
-        with:
-          sonar-token: ${{ env.SONAR_TOKEN }}
-          sonar-host-url: ${{ env.SONAR_HOST_URL }}
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
 
       - name: SonarQube Quality Gate Check
-        uses: SonarSource/sonarqube-quality-gate-action@v2
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
         with:
-          sonar-token: ${{ env.SONAR_TOKEN }}
-          sonar-host-url: ${{ env.SONAR_HOST_URL }}
-          scan-metadata-file-path: ${{ steps.sonar.outputs.scan-metadata-file-path }}
-        timeout-minutes: 5
+          pollingTimeoutSec: 300
 
       # - name: OWASP Dependency Check
       #   continue-on-error: true
