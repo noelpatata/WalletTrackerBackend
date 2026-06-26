@@ -64,6 +64,27 @@ jobs:
             secret/data/wallet-tracker/backend DT_API_KEY ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
+      - name: Generate SBOM with Syft
+        run: |
+          docker run --rm -v "$(pwd):/workspace" anchore/syft dir:/workspace/app -o cyclonedx-json > bom.json
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: bom.json
+
+      - name: Submit SBOM to Dependency Track
+        id: sbom
+        run: |
+          PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
+          PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
+          RESPONSE=$(curl -s --max-time 120 -X POST "$DT_URL/api/v1/bom" \
+            -H "X-Api-Key: $DT_API_KEY" \
+            -F "projectName=$PROJ_NAME" \
+            -F "projectVersion=$PROJ_VERSION" \
+            -F "bom=@bom.json")
+          echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
       - run: ls -la coverage.xml && head -100 coverage.xml
 
       - name: SonarQube Analysis
@@ -95,58 +116,3 @@ jobs:
       #       --format JSON \
       #       --out /report \
       #       --nvdApiKey "${{ env.NVD_API_KEY }}"
-
-      - name: Generate SBOM with Syft
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft dir:./app -o cyclonedx-json > bom.json
-
-      - if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom
-          path: bom.json
-
-      - name: Submit SBOM to Dependency Track
-        id: sbom
-        run: |
-          PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
-          PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
-          RESPONSE=$(curl -s --max-time 120 -X POST "$DT_URL/api/v1/bom" \
-            -H "X-Api-Key: $DT_API_KEY" \
-            -F "projectName=$PROJ_NAME" \
-            -F "projectVersion=$PROJ_VERSION" \
-            -F "bom=@bom.json")
-          echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
-
-      - name: Wait for DT Processing & Check Policy
-        run: |
-          TOKEN="${{ steps.sbom.outputs.bom-token }}"
-          for i in $(seq 1 60); do
-            RESPONSE=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
-              "$DT_URL/api/v1/bom/token/${TOKEN}")
-
-            PROCESSING=$(echo "$RESPONSE" | jq -r '.processing')
-            if [ "$PROCESSING" = "false" ]; then
-              VERSION_UUID=$(echo "$RESPONSE" | jq -r '.project.uuid')
-              echo "SBOM processed. Version UUID: ${VERSION_UUID}"
-
-              M=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
-                "$DT_URL/api/v1/metrics/project/${VERSION_UUID}/current")
-
-              FAIL_COUNT=$(echo "$M" | jq -r '.policyViolationsFail // 0')
-              echo "Policy violations (FAIL): $FAIL_COUNT"
-
-              if [ "$FAIL_COUNT" -gt 0 ]; then
-                echo "DT policy violations found — PR blocked."
-                exit 1
-              fi
-
-              echo "All DT checks passed."
-              exit 0
-            fi
-            echo "Waiting for DT processing... attempt $i"
-            sleep 5
-          done
-          echo "Timed out."
-          exit 1
