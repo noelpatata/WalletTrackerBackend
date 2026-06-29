@@ -60,8 +60,8 @@ jobs:
           secrets: |
             secret/data/wallet-tracker/backend SONAR_TOKEN ;
             secret/data/wallet-tracker/backend SONAR_HOST_URL ;
-            secret/data/wallet-tracker/backend DT_URL ;
-            secret/data/wallet-tracker/backend DT_API_KEY ;
+            secret/data/wallet-tracker/backend DTRACK_BASE_URL | DT_URL ;
+            secret/data/wallet-tracker/backend DTRACK_API_KEY | DT_API_KEY ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
       - name: Generate SBOM with Syft
@@ -79,12 +79,38 @@ jobs:
         run: |
           PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
           PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
-          RESPONSE=$(curl -s --max-time 120 -X POST "$DT_URL/api/v1/bom" \
+
+          echo "::debug::Submitting BOM to $DT_URL/api/v1/bom for $PROJ_NAME v$PROJ_VERSION"
+
+          HTTP_RESPONSE=$(mktemp)
+          HTTP_STATUS=$(curl -sS --max-time 120 -X POST "$DT_URL/api/v1/bom" \
             -H "X-Api-Key: $DT_API_KEY" \
             -F "projectName=$PROJ_NAME" \
             -F "projectVersion=$PROJ_VERSION" \
-            -F "bom=@bom.json")
-          echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
+            -F "bom=@bom.json" \
+            -w "%{http_code}" \
+            -o "$HTTP_RESPONSE") || true
+          echo "::debug::Raw curl status output: [$HTTP_STATUS]"
+
+          echo "::debug::HTTP status: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::warning::Dependency Track returned HTTP $HTTP_STATUS"
+            echo "Response:"
+            cat "$HTTP_RESPONSE" || echo "(empty)"
+            echo "bom-token=" >> "$GITHUB_OUTPUT"
+          else
+            BOM_TOKEN=$(jq -r '.token' "$HTTP_RESPONSE" 2>/dev/null || echo "")
+            if [ -z "$BOM_TOKEN" ] || [ "$BOM_TOKEN" = "null" ]; then
+              echo "::warning::Failed to extract BOM token from DT response"
+              cat "$HTTP_RESPONSE"
+              echo "bom-token=" >> "$GITHUB_OUTPUT"
+            else
+              echo "::debug::BOM token: $BOM_TOKEN"
+              echo "bom-token=$BOM_TOKEN" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          rm -f "$HTTP_RESPONSE"
       - run: ls -la coverage.xml && head -100 coverage.xml
 
       - name: SonarQube Analysis
