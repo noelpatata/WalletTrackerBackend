@@ -89,7 +89,7 @@ def register():
 
 @auth_bp.route("/api/v1/getUserServerPubKey/", methods=['GET'])
 @token_required
-def get_user_pub_key(user_id, session, _):
+def get_user_pub_key(user_id, session, user):
     try:
 
         if not user_id:
@@ -106,7 +106,7 @@ def get_user_pub_key(user_id, session, _):
 
 @auth_bp.route("/api/v1/setUserClientPubKey/", methods=['POST'])
 @token_required
-def set_user_pub_key(user_id, session, _):
+def set_user_pub_key(user_id, session, user):
     try:
         data = request.get_json()
 
