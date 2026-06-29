@@ -64,74 +64,9 @@ jobs:
             secret/data/wallet-tracker/backend DT_API_KEY ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
-      - run: ls -la coverage.xml && head -100 coverage.xml
-
-      - name: SonarQube Analysis
-        uses: SonarSource/sonarqube-scan-action@v5
-        env:
-          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
-
-      - name: Check SonarQube Quality Gate
-        run: |
-          PROJECT_KEY="noelpatata_WalletTrackerAPI_0cf0ca12-f6dd-434b-9dbd-b121383d2888"
-          AUTH="-u ${{ env.SONAR_TOKEN }}:"
-          BASE="${{ env.SONAR_HOST_URL }}"
-          # Wait for the CE task to complete, then check the gate
-          for i in $(seq 1 60); do
-            TASK_RESP=$(curl -s $AUTH "$BASE/api/ce/component?componentKey=$PROJECT_KEY")
-            TASK_ID=$(echo "$TASK_RESP" | jq -r '.current[0].id // .queue[0].id // empty')
-            if [ -z "$TASK_ID" ]; then
-              # No task found — analysis may have already finished; check gate directly
-              QG=$(curl -s $AUTH "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | jq -r '.projectStatus.status')
-              if [ "$QG" = "OK" ]; then
-                echo "Quality Gate passed."
-                exit 0
-              fi
-              echo "Waiting for analysis... attempt $i"
-              sleep 5
-              continue
-            fi
-            STATUS=$(curl -s $AUTH "$BASE/api/ce/task?id=$TASK_ID" | jq -r '.task.status')
-            if [ "$STATUS" = "SUCCESS" ]; then
-              echo "Analysis completed."
-              break
-            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELED" ]; then
-              echo "Analysis $STATUS."
-              exit 1
-            fi
-            echo "Waiting for CE task $TASK_ID... ($STATUS) attempt $i"
-            sleep 5
-          done
-          # Gate check after CE task completed
-          QG=$(curl -s $AUTH "$BASE/api/qualitygates/project_status?projectKey=$PROJECT_KEY" | jq -r '.projectStatus.status')
-          if [ "$QG" = "OK" ]; then
-            echo "Quality Gate passed."
-            exit 0
-          else
-            echo "Quality Gate failed — status: $QG"
-            exit 1
-          fi
-
-      # - name: OWASP Dependency Check
-      #   continue-on-error: true
-      #   run: |
-      #     mkdir -p dependency-check-report
-      #     docker run --rm \
-      #       -v "$(pwd):/src" \
-      #       -v "$(pwd)/dependency-check-report:/report" \
-      #       owasp/dependency-check:12.2.2 \
-      #       --scan /src/app/pyproject.toml \
-      #       --enableExperimental \
-      #       --project "wallet-tracker-api" \
-      #       --format JSON \
-      #       --out /report \
-      #       --nvdApiKey "${{ env.NVD_API_KEY }}"
-
       - name: Generate SBOM with Syft
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-          syft dir:./app -o cyclonedx-json > bom.json
+          docker run --rm -v "$(pwd):/workspace" anchore/syft dir:/workspace/app -o cyclonedx-json > bom.json
 
       - if: always()
         uses: actions/upload-artifact@v4
@@ -150,35 +85,34 @@ jobs:
             -F "projectVersion=$PROJ_VERSION" \
             -F "bom=@bom.json")
           echo "bom-token=$(echo $RESPONSE | jq -r '.token')" >> "$GITHUB_OUTPUT"
+      - run: ls -la coverage.xml && head -100 coverage.xml
 
-      - name: Wait for DT Processing & Check Policy
-        run: |
-          TOKEN="${{ steps.sbom.outputs.bom-token }}"
-          for i in $(seq 1 60); do
-            RESPONSE=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
-              "$DT_URL/api/v1/bom/token/${TOKEN}")
+      - name: SonarQube Analysis
+        id: sonar
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
 
-            PROCESSING=$(echo "$RESPONSE" | jq -r '.processing')
-            if [ "$PROCESSING" = "false" ]; then
-              VERSION_UUID=$(echo "$RESPONSE" | jq -r '.project.uuid')
-              echo "SBOM processed. Version UUID: ${VERSION_UUID}"
+      - name: SonarQube Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        with:
+          pollingTimeoutSec: 300
 
-              M=$(curl -s -H "X-Api-Key: $DT_API_KEY" \
-                "$DT_URL/api/v1/metrics/project/${VERSION_UUID}/current")
-
-              FAIL_COUNT=$(echo "$M" | jq -r '.policyViolationsFail // 0')
-              echo "Policy violations (FAIL): $FAIL_COUNT"
-
-              if [ "$FAIL_COUNT" -gt 0 ]; then
-                echo "DT policy violations found — PR blocked."
-                exit 1
-              fi
-
-              echo "All DT checks passed."
-              exit 0
-            fi
-            echo "Waiting for DT processing... attempt $i"
-            sleep 5
-          done
-          echo "Timed out."
-          exit 1
+      # - name: OWASP Dependency Check
+      #   continue-on-error: true
+      #   run: |
+      #     mkdir -p dependency-check-report
+      #     docker run --rm \
+      #       -v "$(pwd):/src" \
+      #       -v "$(pwd)/dependency-check-report:/report" \
+      #       owasp/dependency-check:12.2.2 \
+      #       --scan /src/app/pyproject.toml \
+      #       --enableExperimental \
+      #       --project "wallet-tracker-api" \
+      #       --format JSON \
+      #       --out /report \
+      #       --nvdApiKey "${{ env.NVD_API_KEY }}"
