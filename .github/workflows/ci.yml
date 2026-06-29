@@ -68,7 +68,7 @@ jobs:
       - name: Generate SBOM with Syft
         run: |
           docker run --rm -v "$(pwd):/workspace" anchore/syft dir:/workspace/app -o cyclonedx-json \
-            | jq '.specVersion = "1.5"' > bom.json
+            | jq '.specVersion = "1.5" | ."$schema" = "http://cyclonedx.org/schema/bom-1.5.schema.json"' > bom.json
 
       - if: always()
         uses: actions/upload-artifact@v4
