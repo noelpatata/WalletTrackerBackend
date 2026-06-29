@@ -32,10 +32,7 @@ pipeline {
                                 secretValues: [
                                     [envVar: 'REGISTRY',        vaultKey: 'REGISTRY_IP'],
                                     [envVar: 'DOCKER_USERNAME', vaultKey: 'REGISTRY_USER'],
-                                    [envVar: 'DOCKER_PASSWORD', vaultKey: 'REGISTRY_PASSWORD'],
-                                    [envVar: 'NVD_API_KEY',     vaultKey: 'NVD_API_KEY'],
-                                    [envVar: 'DTRACK_URL',      vaultKey: 'DTRACK_BASE_URL'],
-                                    [envVar: 'DTRACK_API_KEY',  vaultKey: 'DTRACK_API_KEY']
+                                    [envVar: 'DOCKER_PASSWORD', vaultKey: 'REGISTRY_PASSWORD']
                                 ]
                             ]
                         ]
@@ -57,12 +54,6 @@ pipeline {
                         }
                     }
                     }
-                }
-            }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'dependency-check-report/**/*', allowEmptyArchive: true
-                    dependencyCheckPublisher pattern: 'dependency-check-report/dependency-check-report.xml'
                 }
             }
         }
