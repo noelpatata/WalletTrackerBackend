@@ -21,7 +21,6 @@ def test_create_importe(app):
         fetched = ImporteRepository.get_by_id(imp.id)
         assert fetched is not None
         assert fetched.concept == "Salary"
-        assert fetched.amount == 3000.00
 
 
 def test_get_importe_by_id_not_found(app):

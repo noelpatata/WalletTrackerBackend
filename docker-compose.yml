@@ -34,6 +34,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./tests:/app/tests
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/api/v1/health/').status == 200 else 1)"]
       interval: 5s

@@ -1,4 +1,4 @@
-FROM python:3.12-alpine AS builder
+FROM python:3.12-alpine
 
 RUN apk add --no-cache \
     ca-certificates \
@@ -6,26 +6,22 @@ RUN apk add --no-cache \
     gcc \
     musl-dev \
     build-base \
-    linux-headers \
-    uv
+    linux-headers
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
-RUN UV_SYSTEM_PYTHON=1 uv sync --frozen --no-install-project --no-cache
-
-FROM python:3.12-alpine
-
-RUN apk add --no-cache \
-    ca-certificates \
-    mariadb-connector-c
-
-WORKDIR /app
-
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+RUN uv sync --frozen \
+&& apk del gcc musl-dev build-base linux-headers
 
 COPY . .
 
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup \
+    && chown -R appuser:appgroup /app
+
+USER appuser
+
 EXPOSE 5000
-CMD ["uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]
+CMD ["uv", "run", "--frozen", "uwsgi", "--http", "0.0.0.0:5000", "--wsgi-file", "main.py", "--callable", "app"]

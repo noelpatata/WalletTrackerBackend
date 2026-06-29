@@ -49,7 +49,7 @@ def login():
 @auth_bp.route("/api/v1/register/", methods=['POST'])
 def register():
     try:
-        if not ENABLE_REGISTER.lower() == "true":
+        if ENABLE_REGISTER.lower() != "true":
             return make_response(None, False, Messages.INVALID_REQUEST), 403
             
         data = request.get_json()
@@ -89,7 +89,7 @@ def register():
 
 @auth_bp.route("/api/v1/getUserServerPubKey/", methods=['GET'])
 @token_required
-def get_user_pub_key(user_id, session, user):
+def get_user_pub_key(user_id, session, _):
     try:
 
         if not user_id:
@@ -106,7 +106,7 @@ def get_user_pub_key(user_id, session, user):
 
 @auth_bp.route("/api/v1/setUserClientPubKey/", methods=['POST'])
 @token_required
-def set_user_pub_key(user_id, session, user):
+def set_user_pub_key(user_id, session, _):
     try:
         data = request.get_json()
 

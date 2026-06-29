@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  python-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,14 +21,120 @@ jobs:
           WALLET_TRACKER_DB_USER=root
           WALLET_TRACKER_DB_HOST=db
           ENABLE_REGISTER=true
-          COMPOSE_PROFILES=db,app
+          COMPOSE_PROFILES=app, db
           EOF
 
       - run: docker compose up -d --build
 
+      - run: docker compose exec -T app uv run pytest --cov=. --cov-report=xml --cov-report=term -v
 
-      - run: docker compose exec -T app pytest -v
+      - run: docker compose cp app:/app/coverage.xml ./coverage.xml && sed -i 's|<source>/app</source>|<source>app</source>|g; s|<source>\.</source>|<source>app</source>|g' coverage.xml
+
+      - run: head -100 coverage.xml
 
       - if: always()
         run: docker compose down --volumes
 
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  security-checks:
+    runs-on: ubuntu-latest
+    needs: [python-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+
+      - name: Fetch secrets from Vault
+        uses: hashicorp/vault-action@v4
+        with:
+          url: https://vault.downops.win
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/wallet-tracker/backend SONAR_TOKEN ;
+            secret/data/wallet-tracker/backend SONAR_HOST_URL ;
+            secret/data/wallet-tracker/backend DT_URL ;
+            secret/data/wallet-tracker/backend DT_API_KEY ;
+            secret/data/wallet-tracker/backend DT_PROJECT_UUID ;
+            secret/data/wallet-tracker/backend NVD_API_KEY
+
+      - name: Generate SBOM with Syft
+        run: |
+          docker run --rm -v "$(pwd):/workspace" anchore/syft dir:/workspace/app -o cyclonedx-json \
+            | jq '.specVersion = "1.5" | ."$schema" = "http://cyclonedx.org/schema/bom-1.5.schema.json"' > bom.json
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: bom.json
+
+      - name: Submit SBOM to Dependency Track
+        id: sbom
+        run: |
+          BODY_FILE=$(mktemp)
+          jq -n --arg project "$DT_PROJECT_UUID" --rawfile bom bom.json \
+            '{project: $project, bom: ($bom | @base64)}' > "$BODY_FILE"
+          HTTP_RESPONSE=$(mktemp)
+          HTTP_STATUS=$(curl -sS --max-time 120 -X "PUT" "$DT_URL/api/v1/bom" \
+            -H "Content-Type: application/json" \
+            -H "X-Api-Key: $DT_API_KEY" \
+            -d @"$BODY_FILE" \
+            -w "%{http_code}" \
+            -o "$HTTP_RESPONSE") || true
+          rm -f "$BODY_FILE"
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::warning::Dependency Track returned HTTP $HTTP_STATUS"
+            echo "Response:"
+            cat "$HTTP_RESPONSE" || echo "(empty)"
+            echo "bom-token=" >> "$GITHUB_OUTPUT"
+          else
+            BOM_TOKEN=$(jq -r '.token' "$HTTP_RESPONSE" 2>/dev/null || echo "")
+            if [ -z "$BOM_TOKEN" ] || [ "$BOM_TOKEN" = "null" ]; then
+              echo "::warning::Failed to extract BOM token from DT response"
+              cat "$HTTP_RESPONSE"
+              echo "bom-token=" >> "$GITHUB_OUTPUT"
+            else
+              echo "bom-token=$BOM_TOKEN" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          rm -f "$HTTP_RESPONSE"
+      - run: ls -la coverage.xml && head -100 coverage.xml
+
+      - name: SonarQube Analysis
+        id: sonar
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate Check
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        env:
+          SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        with:
+          pollingTimeoutSec: 300
+
+      # - name: OWASP Dependency Check
+      #   continue-on-error: true
+      #   run: |
+      #     mkdir -p dependency-check-report
+      #     docker run --rm \
+      #       -v "$(pwd):/src" \
+      #       -v "$(pwd)/dependency-check-report:/report" \
+      #       owasp/dependency-check:12.2.2 \
+      #       --scan /src/app/pyproject.toml \
+      #       --enableExperimental \
+      #       --project "wallet-tracker-api" \
+      #       --format JSON \
+      #       --out /report \
+      #       --nvdApiKey "${{ env.NVD_API_KEY }}"

@@ -17,7 +17,7 @@ def test_create_category(app):
 
 def test_get_category_by_id(app):
     with app.app_context():
-        ExpenseCategoryRepository.get_by_id(1).total == 0
+        assert ExpenseCategoryRepository.get_by_id(1).total == 0
 
 
 def test_get_all_categories(app):

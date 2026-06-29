@@ -6,6 +6,5 @@ __pycache__
 logs/
 *.pem
 .env
-tests/
 debugging/
 migrations_main/README
