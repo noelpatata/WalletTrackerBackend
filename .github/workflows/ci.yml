@@ -62,6 +62,7 @@ jobs:
             secret/data/wallet-tracker/backend SONAR_HOST_URL ;
             secret/data/wallet-tracker/backend DT_URL ;
             secret/data/wallet-tracker/backend DT_API_KEY ;
+            secret/data/wallet-tracker/backend DT_PROJECT_UUID ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
       - name: Generate SBOM with Syft
@@ -77,16 +78,12 @@ jobs:
       - name: Submit SBOM to Dependency Track
         id: sbom
         run: |
-          PROJ_NAME=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['name'])")
-          PROJ_VERSION=$(python3 -c "import tomllib; f=open('app/pyproject.toml','rb'); print(tomllib.load(f)['project']['version'])")
-
-          echo "::debug::Submitting BOM to $DT_URL/api/v1/bom for $PROJ_NAME v$PROJ_VERSION"
+          echo "::debug::Submitting BOM to $DT_URL/api/v1/bom for project UUID $DT_PROJECT_UUID"
 
           HTTP_RESPONSE=$(mktemp)
           HTTP_STATUS=$(curl -sS --max-time 120 -X POST "$DT_URL/api/v1/bom" \
             -H "X-Api-Key: $DT_API_KEY" \
-            -F "projectName=$PROJ_NAME" \
-            -F "projectVersion=$PROJ_VERSION" \
+            -F "projectUuid=$DT_PROJECT_UUID" \
             -F "bom=@bom.json" \
             -w "%{http_code}" \
             -o "$HTTP_RESPONSE") || true
