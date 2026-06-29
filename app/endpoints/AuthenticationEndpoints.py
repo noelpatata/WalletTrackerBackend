@@ -94,11 +94,6 @@ def get_user_pub_key(user_id, session, user):
 
         if not user_id:
             return make_response(None, False, Messages.INVALID_REQUEST), 200
-        
-        user = UserRepository.get_by_id(user_id)
-        if not user:
-            return make_response(None, False, Messages.INVALID_REQUEST), 200
-        
         return make_response({'userId': user.id, 'publicKey':user.public_key}, True, AuthMessages.FETCHED_SERVER_PUB_KEY), 200
     except Exception as e:
         return make_response(None, False, Messages.INTERNAL_ERROR, e), 500
@@ -120,7 +115,6 @@ def set_user_pub_key(user_id, session, user):
         if not user_id:
             return make_response(None, False, Messages.INVALID_REQUEST), 200
         
-        user = UserRepository.get_by_id(user_id)
         user.client_public_key = pub_key_b64
         user.save()
         
