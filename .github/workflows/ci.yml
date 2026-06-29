@@ -60,8 +60,8 @@ jobs:
           secrets: |
             secret/data/wallet-tracker/backend SONAR_TOKEN ;
             secret/data/wallet-tracker/backend SONAR_HOST_URL ;
-            secret/data/wallet-tracker/backend DTRACK_BASE_URL | DT_URL ;
-            secret/data/wallet-tracker/backend DTRACK_API_KEY | DT_API_KEY ;
+            secret/data/wallet-tracker/backend DT_URL ;
+            secret/data/wallet-tracker/backend DT_API_KEY ;
             secret/data/wallet-tracker/backend NVD_API_KEY
 
       - name: Generate SBOM with Syft
