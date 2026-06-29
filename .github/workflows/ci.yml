@@ -78,13 +78,17 @@ jobs:
       - name: Submit SBOM to Dependency Track
         id: sbom
         run: |
+          BODY_FILE=$(mktemp)
+          jq -n --arg project "$DT_PROJECT_UUID" --rawfile bom bom.json \
+            '{project: $project, bom: ($bom | @base64)}' > "$BODY_FILE"
           HTTP_RESPONSE=$(mktemp)
           HTTP_STATUS=$(curl -sS --max-time 120 -X "PUT" "$DT_URL/api/v1/bom" \
             -H "Content-Type: application/json" \
             -H "X-Api-Key: $DT_API_KEY" \
-            -d "$(jq -n --arg project "$DT_PROJECT_UUID" --rawfile bom bom.json '{project: $project, bom: ($bom | @base64)}')" \
+            -d @"$BODY_FILE" \
             -w "%{http_code}" \
             -o "$HTTP_RESPONSE") || true
+          rm -f "$BODY_FILE"
 
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "::warning::Dependency Track returned HTTP $HTTP_STATUS"
