@@ -78,18 +78,14 @@ jobs:
       - name: Submit SBOM to Dependency Track
         id: sbom
         run: |
-          echo "::debug::Submitting BOM to $DT_URL/api/v1/bom for project UUID $DT_PROJECT_UUID"
-
+          BOM_B64=$(base64 -w0 bom.json)
           HTTP_RESPONSE=$(mktemp)
-          HTTP_STATUS=$(curl -sS --max-time 120 -X POST "$DT_URL/api/v1/bom" \
+          HTTP_STATUS=$(curl -sS --max-time 120 -X "PUT" "$DT_URL/api/v1/bom" \
+            -H "Content-Type: application/json" \
             -H "X-Api-Key: $DT_API_KEY" \
-            -F "projectUuid=$DT_PROJECT_UUID" \
-            -F "bom=@bom.json" \
+            -d "$(jq -n --arg project "$DT_PROJECT_UUID" --arg bom "$BOM_B64" '{project: $project, bom: $bom}')" \
             -w "%{http_code}" \
             -o "$HTTP_RESPONSE") || true
-          echo "::debug::Raw curl status output: [$HTTP_STATUS]"
-
-          echo "::debug::HTTP status: $HTTP_STATUS"
 
           if [ "$HTTP_STATUS" != "200" ]; then
             echo "::warning::Dependency Track returned HTTP $HTTP_STATUS"
@@ -103,7 +99,6 @@ jobs:
               cat "$HTTP_RESPONSE"
               echo "bom-token=" >> "$GITHUB_OUTPUT"
             else
-              echo "::debug::BOM token: $BOM_TOKEN"
               echo "bom-token=$BOM_TOKEN" >> "$GITHUB_OUTPUT"
             fi
           fi
