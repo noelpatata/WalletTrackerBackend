@@ -5,18 +5,18 @@ variable "api_public_hostname" {
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "api" {
-  account_id = data.vault_kv_secret_v2.backend.data["CLOUDFLARE_ACCOUNT_ID"]
+  account_id = data.vault_kv_secret_v2.common.data["CLOUDFLARE_ACCOUNT_ID"]
   name       = "wallettracker-api"
   depends_on = [null_resource.deploy_api]
 }
 
 data "cloudflare_zero_trust_tunnel_cloudflared_token" "api" {
-  account_id = data.vault_kv_secret_v2.backend.data["CLOUDFLARE_ACCOUNT_ID"]
+  account_id = data.vault_kv_secret_v2.common.data["CLOUDFLARE_ACCOUNT_ID"]
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.api.id
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared_config" "api" {
-  account_id = data.vault_kv_secret_v2.backend.data["CLOUDFLARE_ACCOUNT_ID"]
+  account_id = data.vault_kv_secret_v2.common.data["CLOUDFLARE_ACCOUNT_ID"]
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.api.id
 
   config = {
@@ -33,7 +33,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "api" {
 }
 
 resource "cloudflare_dns_record" "api" {
-  zone_id = data.vault_kv_secret_v2.backend.data["CLOUDFLARE_ZONE_ID"]
+  zone_id = data.vault_kv_secret_v2.app.data["CLOUDFLARE_ZONE_ID"]
   name    = "api"
   content = "${cloudflare_zero_trust_tunnel_cloudflared.api.id}.cfargotunnel.com"
   type    = "CNAME"
@@ -50,8 +50,8 @@ resource "null_resource" "setup_cloudflared" {
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
 
   provisioner "file" {

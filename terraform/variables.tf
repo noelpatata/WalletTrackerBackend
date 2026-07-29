@@ -4,6 +4,24 @@ variable "vault_addr" {
   default     = "https://vault.downops.win"
 }
 
+variable "vault_kv_mount" {
+  description = "Vault KV v2 mount where project secrets are stored"
+  type        = string
+  default     = "downops"
+}
+
+variable "vault_kv_common_secret_path" {
+  description = "Path under the Vault KV v2 mount holding shared/common infrastructure secrets"
+  type        = string
+  default     = "common"
+}
+
+variable "vault_kv_app_secret_path" {
+  description = "Path under the Vault KV v2 mount holding app-specific secrets"
+  type        = string
+  default     = "wallettracker.backend"
+}
+
 variable "proxmox_ip" {
   description = "Proxmox IP address"
   type        = string

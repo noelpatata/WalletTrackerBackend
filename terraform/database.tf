@@ -25,9 +25,9 @@ resource "null_resource" "ensure_mariadb_volume" {
   }
   connection {
     type     = "ssh"
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
     host     = var.proxmox_ip
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
   provisioner "remote-exec" {
     inline = [
@@ -48,7 +48,7 @@ resource "proxmox_lxc" "mariadb" {
   target_node  = var.target_node
   hostname     = var.db_hostname
   ostemplate   = "local:vztmpl/alpine-3.22-default_20250617_amd64.tar.xz"
-  password     = data.vault_kv_secret_v2.backend.data["DB_CONTAINER_PASSWORD"]
+  password     = data.vault_kv_secret_v2.app.data["DB_CONTAINER_PASSWORD"]
   cores        = 1
   memory       = 512
   swap         = 512
@@ -83,8 +83,8 @@ resource "null_resource" "setup_mariadb_in_container" {
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
 
   provisioner "remote-exec" {
@@ -107,7 +107,7 @@ resource "null_resource" "setup_mariadb_in_container" {
         pct exec ${proxmox_lxc.mariadb.vmid} -- rc-service mariadb start
         pct exec ${proxmox_lxc.mariadb.vmid} -- rc-update add mariadb
 
-        pct exec ${proxmox_lxc.mariadb.vmid} -- mariadb -e "CREATE USER IF NOT EXISTS 'root'@'${var.api_container_ip}' IDENTIFIED BY '${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'${var.api_container_ip}' WITH GRANT OPTION; FLUSH PRIVILEGES;"
+        pct exec ${proxmox_lxc.mariadb.vmid} -- mariadb -e "CREATE USER IF NOT EXISTS 'root'@'${var.api_container_ip}' IDENTIFIED BY '${data.vault_kv_secret_v2.app.data["MARIADB_ROOT_PASSWORD"]}'; GRANT ALL PRIVILEGES ON *.* TO 'root'@'${var.api_container_ip}' WITH GRANT OPTION; FLUSH PRIVILEGES;"
 
         pct exec ${proxmox_lxc.mariadb.vmid} -- sed -i 's/^skip-networking/#skip-networking/' /etc/my.cnf.d/mariadb-server.cnf
         pct exec ${proxmox_lxc.mariadb.vmid} -- sed -i 's/^#bind-address=.*/bind-address = ${var.db_container_ip}/' /etc/my.cnf.d/mariadb-server.cnf
@@ -134,8 +134,8 @@ resource "null_resource" "deploy_mariadb" {
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
 
   provisioner "remote-exec" {
@@ -145,7 +145,7 @@ resource "null_resource" "deploy_mariadb" {
       if [ -f "${var.db_volume}/ibdata1" ]; then
         pct exec ${proxmox_lxc.mariadb.vmid} -- sed -i 's/^#bind-address=.*/bind-address = ${var.db_container_ip}/' /etc/my.cnf.d/mariadb-server.cnf
         pct exec ${proxmox_lxc.mariadb.vmid} -- mariadb -u root -e \
-          "ALTER USER 'root'@'${var.api_container_ip}' IDENTIFIED BY '${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}'; FLUSH PRIVILEGES;"
+          "ALTER USER 'root'@'${var.api_container_ip}' IDENTIFIED BY '${data.vault_kv_secret_v2.app.data["MARIADB_ROOT_PASSWORD"]}'; FLUSH PRIVILEGES;"
       else
         echo "[INFO] Fresh install detected, skipping ALTER USER."
       fi

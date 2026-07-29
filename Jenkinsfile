@@ -27,7 +27,7 @@ pipeline {
                         // vault secrets fetching
                         vaultSecrets: [
                             [
-                                path: "secret/wallet-tracker/backend",
+                                path: "downops/common",
                                 engineVersion: 2,
                                 secretValues: [
                                     [envVar: 'REGISTRY',        vaultKey: 'REGISTRY_IP'],

@@ -58,12 +58,12 @@ jobs:
           url: https://vault.downops.win
           token: ${{ secrets.VAULT_TOKEN }}
           secrets: |
-            secret/data/wallet-tracker/backend SONAR_TOKEN ;
-            secret/data/wallet-tracker/backend SONAR_HOST_URL ;
-            secret/data/wallet-tracker/backend DT_URL ;
-            secret/data/wallet-tracker/backend DT_API_KEY ;
-            secret/data/wallet-tracker/backend DT_PROJECT_UUID ;
-            secret/data/wallet-tracker/backend NVD_API_KEY
+            downops/data/wallettracker.backend SONAR_TOKEN ;
+            downops/data/wallettracker.backend SONAR_HOST_URL ;
+            downops/data/wallettracker.backend DT_URL ;
+            downops/data/wallettracker.backend DT_API_KEY ;
+            downops/data/wallettracker.backend DT_PROJECT_UUID ;
+            downops/data/wallettracker.backend NVD_API_KEY
 
       - name: Generate SBOM with Syft
         run: |

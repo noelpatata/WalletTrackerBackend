@@ -18,7 +18,7 @@ locals {
     command_args="--ini $${directory}/uwsgi.ini --logto2 /var/log/wallettracker.log"
     command_background="yes"
 
-    export DATABASE_ROOT_PASSWORD="${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}"
+    export DATABASE_ROOT_PASSWORD="${data.vault_kv_secret_v2.app.data["MARIADB_ROOT_PASSWORD"]}"
     export WALLET_TRACKER_DB_USER="root"
     export WALLET_TRACKER_DB_HOST="${var.db_container_ip}"
     export DATABASE_NAME="wallet_tracker"
@@ -35,7 +35,7 @@ resource "proxmox_lxc" "api" {
   target_node = var.target_node
   hostname    = var.api_hostname
   ostemplate  = "local:vztmpl/alpine-3.22-default_20250617_amd64.tar.xz"
-  password    = data.vault_kv_secret_v2.backend.data["BACKEND_CONTAINER_PASSWORD"]
+  password    = data.vault_kv_secret_v2.app.data["BACKEND_CONTAINER_PASSWORD"]
   cores       = 1
   memory      = 512
   swap        = 512
@@ -62,8 +62,8 @@ resource "null_resource" "setup_api_in_container" {
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
 
   provisioner "file" {
@@ -109,8 +109,8 @@ resource "null_resource" "deploy_api" {
   connection {
     type     = "ssh"
     host     = var.proxmox_ip
-    user     = data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]
-    password = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+    user     = data.vault_kv_secret_v2.common.data["PROXMOX_USER"]
+    password = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   }
 
   provisioner "remote-exec" {
@@ -121,7 +121,7 @@ resource "null_resource" "deploy_api" {
 
       pct exec ${local.api_vmid} -- uv sync --no-dev --no-install-project --project ${local.repo_path}/app
 
-      pct exec ${local.api_vmid} -- sh -c "export DATABASE_ROOT_PASSWORD='${data.vault_kv_secret_v2.backend.data["MARIADB_ROOT_PASSWORD"]}'; export DATABASE_NAME='wallet_tracker'; export WALLET_TRACKER_DB_USER='root'; export WALLET_TRACKER_DB_HOST='${var.db_container_ip}'; ${local.repo_path}/app/.venv/bin/python ${local.repo_path}/app/migrate_all.py"
+      pct exec ${local.api_vmid} -- sh -c "export DATABASE_ROOT_PASSWORD='${data.vault_kv_secret_v2.app.data["MARIADB_ROOT_PASSWORD"]}'; export DATABASE_NAME='wallet_tracker'; export WALLET_TRACKER_DB_USER='root'; export WALLET_TRACKER_DB_HOST='${var.db_container_ip}'; ${local.repo_path}/app/.venv/bin/python ${local.repo_path}/app/migrate_all.py"
 
       pct exec ${local.api_vmid} -- rc-service wallettracker restart
       EOF

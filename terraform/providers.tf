@@ -20,23 +20,23 @@ provider "vault" {
   skip_child_token  = true
 }
 
-data "vault_kv_secret_v2" "backend" {
-  mount = "secret"
-  name  = "wallet-tracker/backend"
+data "vault_kv_secret_v2" "common" {
+  mount = var.vault_kv_mount
+  name  = var.vault_kv_common_secret_path
 }
 
 data "vault_kv_secret_v2" "app" {
-  mount = "secret"
-  name  = "wallet-tracker/app"
+  mount = var.vault_kv_mount
+  name  = var.vault_kv_app_secret_path
 }
 
 provider "cloudflare" {
-  api_token = data.vault_kv_secret_v2.backend.data["CLOUDFLARE_API_TOKEN"]
+  api_token = data.vault_kv_secret_v2.common.data["CLOUDFLARE_API_TOKEN"]
 }
 
 provider "proxmox" {
   pm_api_url      = "https://${var.proxmox_ip}:${var.proxmox_port}/api2/json"
-  pm_user         = "${data.vault_kv_secret_v2.backend.data["PROXMOX_USER"]}@pam"
-  pm_password     = data.vault_kv_secret_v2.backend.data["PROXMOX_PASSWORD"]
+  pm_user         = "${data.vault_kv_secret_v2.common.data["PROXMOX_USER"]}@pam"
+  pm_password     = data.vault_kv_secret_v2.common.data["PROXMOX_PASSWORD"]
   pm_tls_insecure = true
 }
