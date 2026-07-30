@@ -17,11 +17,11 @@ pipeline {
             steps {
                 script {
                     // vault token fetching
-                    withCredentials([[$class: 'VaultTokenCredentialBinding', credentialsId: 'vault-token', vaultAddr: env.VAULT_ADDR]]) {
+                    withCredentials([[$class: 'VaultTokenCredentialBinding', credentialsId: 'wallettracker-vault-token', vaultAddr: env.VAULT_ADDR]]) {
                     withVault(
                         configuration: [
                             vaultUrl: env.VAULT_ADDR,
-                            vaultCredentialId: 'vault-token',
+                            vaultCredentialId: 'wallettracker-vault-token',
                             engineVersion: 2
                         ],
                         // vault secrets fetching
