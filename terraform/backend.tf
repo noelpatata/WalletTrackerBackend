@@ -22,7 +22,7 @@ locals {
     export WALLET_TRACKER_DB_USER="root"
     export WALLET_TRACKER_DB_HOST="${var.db_container_ip}"
     export DATABASE_NAME="wallet_tracker"
-    export WALLET_TRACKER_SECRET="${data.vault_kv_secret_v2.app.data["SIGN_SECRET_WORD"]}"
+    export WALLET_TRACKER_SECRET="${data.vault_kv_secret_v2.common.data["SIGN_SECRET_WORD"]}"
     export ENABLE_REGISTER="false"
 
     start_pre() {
