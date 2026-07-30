@@ -22,6 +22,12 @@ variable "vault_kv_app_secret_path" {
   default     = "wallettracker.backend"
 }
 
+variable "vault_kv_app_common_secret_path" {
+  description = "Path under the Vault KV v2 mount holding app-shared secrets"
+  type        = string
+  default     = "wallettracker.common"
+}
+
 variable "proxmox_ip" {
   description = "Proxmox IP address"
   type        = string

@@ -30,6 +30,11 @@ data "vault_kv_secret_v2" "app" {
   name  = var.vault_kv_app_secret_path
 }
 
+data "vault_kv_secret_v2" "app_common" {
+  mount = var.vault_kv_mount
+  name  = var.vault_kv_app_common_secret_path
+}
+
 provider "cloudflare" {
   api_token = data.vault_kv_secret_v2.common.data["CLOUDFLARE_API_TOKEN"]
 }
