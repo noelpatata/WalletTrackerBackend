@@ -20,9 +20,9 @@ TENANT_MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "migrations_tena
 TENANT_PREFIX         = f"{DATABASE_NAME}_u"
 
 
-# ========================
+# =======================
 # HELPERS
-# ========================
+# =======================
 
 def ensure_database_exists():
     """Connect to MySQL server and create DB if missing"""
